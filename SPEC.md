@@ -180,7 +180,7 @@ the Python watcher** (direct calls, no per-turn network hops). **Only the Orches
 uAgent.** It is notified at every stage (not just the end), is the point-of-record + in-flight
 tracker, and is the ASI:One face + handoff trigger.
 
-**`QueueItem`** — Redis Stream `vaultmind:turns` (P1 writes → P2 reads):
+**`QueueItem`** — Redis Stream `vaultmind:turns` (P1 writes → P2 reads); consumer group **`vaultmind-workers`** (created once by the watcher at startup — P1's producer must never create it):
 ```
 turn_id          unique per turn (session_id + seq)
 source_tool      claude-code | codex
@@ -344,6 +344,9 @@ it actually runs?"
   sub-evaluators (one for the Scribe, one for the Connector) — the proposal's whole "one pass,
   covering the whole process" claim is the deliverable; the single turn-level `pipeline_quality`
   score with its per-axis breakdown is how that one evaluator stays end-to-end.
+- **Model:** `claude-haiku-4-5-20251001` via the Anthropic Python SDK (`ANTHROPIC_API_KEY` from
+  env). Fast and cheap for a fire-and-forget judge; switch to `claude-sonnet-4-6` only if
+  haiku's recall scores prove insufficient after the baseline Arize run.
 
 ### AC-5 — `scanForSecrets` (signature + three call sites)
 
@@ -381,6 +384,11 @@ Returns **matches, not a boolean** — every call site needs the detail. Pattern
   blocks commit + handoff in both modes.
 - **Display vs gate:** display uses the maintained `flags` cache (fast); gates run a **live**
   re-scan (authoritative). Every web-app edit-save re-scans that one node and updates the flag.
+- **CLI contract:** `python -m vaultmind.secrets <path>` always exits **0** (clean or matches)
+  and prints a JSON array to stdout (`[]` for no matches). The pre-commit hook reads the JSON and
+  exits **1** itself if the list is non-empty — the hook, not the CLI, is the git gate. The web
+  app reads the JSON directly (not the exit code). Never change this to exit 1 on match — callers
+  depend on the always-0 contract.
 
 ### AC-6 — Hook configs (finalized) + the session-end resolution
 
@@ -420,8 +428,8 @@ Returns **matches, not a boolean** — every call site needs the detail. Pattern
 
 **Consequence (the spec states the asymmetry plainly):** Review Mode's "session ended"
 checkpoint uses the real `SessionEnd` hook on Claude Code; on Codex there is no such hook, so
-it falls back to the watcher's **idle-timeout heuristic** (no new `Stop` within an idle window
-→ `session idle-timeout (inferred)` in `SessionState.md`) or the other two checkpoints
+it falls back to the watcher's **idle-timeout heuristic** (no new `Stop` within **300 seconds
+(5 minutes)** → `session idle-timeout (inferred)` in `SessionState.md`) or the other two checkpoints
 (web-app-open / explicit). Codex hooks can't run async and may hand a null `transcript_path`,
 so `on_stop.py` must stay minimal and produce `turn_text` regardless. *(Sources:
 code.claude.com/docs/en/hooks; developers.openai.com/codex/hooks. Re-confirm at build — Codex
@@ -532,6 +540,23 @@ the project-wide standing rules that apply regardless of who's working — at mi
   Orchestrator's ASI:One replies, and the evaluator's own judge call — are traced as LLM spans;
   the deterministic/heuristic steps (Note Creator write, Connector linking, hooks) are traced as
   plain spans whose *output* the evaluator scores. Cross-cutting, not a separate stream.
+
+  **Frozen Arize naming — all sessions must match exactly or the dashboard fragments:**
+
+  | key | value |
+  |---|---|
+  | env vars | `ARIZE_SPACE_KEY`, `ARIZE_API_KEY` |
+  | Arize project name | `vaultmind` |
+  | service: P1 | `vaultmind-ingest` |
+  | service: P2 + P3 (watcher process) | `vaultmind-pipeline` |
+  | service: P4 (Next.js server routes) | `vaultmind-webapp` |
+  | root span name (per turn) | `turn` (attribute: `turn_id`) |
+  | evaluator child span | `turn.eval` |
+  | evaluator score attributes | `eval.recall`, `eval.precision`, `eval.extraction_quality`, `eval.link_relevance`, `eval.grounding`, `eval.pipeline_quality`, `eval.detail` |
+
+  The Arize init wrapper (Bucket 4) exports a single `init_arize(service_name: str)` function;
+  each session calls it with the service name from the table above. Never invent a different
+  name — the Arize UI correlates spans across streams by these keys.
 - **Claude Code + Codex** — the two tracked surfaces, via their `Stop`/`SessionEnd` hooks.
 
 **Open — recommended and adopted:**
@@ -559,10 +584,27 @@ follow afterward, per `WORKSTREAMS.md`.
   rules in AC-9, no duplication).
 
 - **Bucket 2 — Frozen contracts + fixtures.** Repo + `vaultmind`-package skeleton;
-  `contracts.py` + mirrored `types.ts` (the six message shapes + node frontmatter); the four
-  file templates (scope nodes, VaultIndex, IntentLog, SessionState); and the **fixture
-  transcript + fixture vault** every stream mocks against. *This is the bucket that freezes the
-  seams.*
+  `contracts.py` (**Pydantic v2 `BaseModel`** for all six message shapes) + mirrored `types.ts`
+  (identical field names and types); the four file templates (scope nodes, VaultIndex,
+  IntentLog, SessionState); and the **fixture transcript + fixture vault** every stream mocks
+  against. *This is the bucket that freezes the seams.*
+
+  **`fixtures/transcript.jsonl` — required content (one `QueueItem` JSON per line):**
+  - Turn 1: yields a `decision` node (Supabase RLS policy choice — use the AC-8 example verbatim)
+  - Turn 2: yields a `constraint` node (no PII in logs)
+  - Turn 3: yields a `question` node (should org-switch invalidate sessions? — AC-8 example)
+  - Turn 4: contains a literal Supabase service-role JWT string — the seeded demo secret for
+    the Intent-B handoff-blocked demo beat (Bucket 3 adds this; Bucket 2 reserves the slot
+    with a `TODO: seed secret here` comment in the file)
+
+  **`fixtures/vault/` — required content:**
+  - One node of each `type`: decision, constraint, goal, question (use AC-8 names/dates verbatim
+    so AC-8's worked examples run against the fixture without modification)
+  - The three scope anchors: `ProjectGoal.md`, `Constraints.md`, `TechStack.md` (populated with
+    the AC-8 standing-frame content)
+  - `IntentLog.md` with at least two entries (AC-8 current + one prior)
+  - One node with `flags: [secret-detected]` (the Supabase-keys node from AC-8 Intent-B) — body
+    contains a masked placeholder; Bucket 3 replaces it with the seeded real pattern
 
 - **Bucket 3 — `scanForSecrets` + git hook.** Python util + `secret-patterns.json` + the
   `python -m vaultmind.secrets` entrypoint + the pre-commit hook + tests for all three
@@ -571,7 +613,11 @@ follow afterward, per `WORKSTREAMS.md`.
 - **Bucket 4 — Runtime skeleton.** Redis (docker-compose); the two hook configs; the
   watcher-loop skeleton (consumer-group + ACK + idempotency + `TurnProgress`, with stubbed
   plug-in points for Scribe/NoteCreator/Connector); the Arize init wrapper;
-  `npm run vaultmind:start`.
+  `npm run vaultmind:start`. **This single command starts exactly three processes concurrently:**
+  (1) `docker compose up -d` (Redis — idempotent if already running), (2) `python -m
+  vaultmind.watcher` (the pipeline consumer loop, creates `vaultmind-workers` consumer group at
+  startup), and (3) `next dev` (the web app on port **3000**). All three must be running before
+  Bucket 5's live-fire test begins.
 
 - **Bucket 5 — Walking skeleton (seam proof).** Stubs wired end-to-end so the seams are
   *demonstrated* parallel-safe before any owner commits real hours.

@@ -4,8 +4,8 @@ How to read this: `SPEC.md` is the contract (schemas, the six message shapes, `s
 hook configs). This file is **who runs what session, what each can build in isolation, when each
 seam goes live, and the order to work in.** When in doubt about a shape, SPEC.md wins.
 
-Paths are relative to the tool repo root (`/home/tim/vault_mind`, which *is* `vaultmind-cli`;
-it installs into a user's project as `.vaultmind/`). The exact tree is finalized in Bucket 2;
+Paths are relative to the tool repo root (the `vault_mind` repo; it installs into a user's
+project as `.vaultmind/`). The exact tree is finalized in Bucket 2;
 the package is `vaultmind/`, the web app is `webapp/`, shared fixtures live in `fixtures/`.
 
 **Foundations-first gate.** No stream session starts until Buckets 2–5 land. Buckets 2–4 are
@@ -181,7 +181,8 @@ beat*, not a number nobody looks at.
   (enforce in P3; add a test asserting the body is byte-identical before/after linking).
 - **Concurrent-write test (build-time requirement).** `IntentLog.md` has two writers (P2's
   `ai-detected`, P4's manual/handoff) and `SessionState.md` is watcher-written + P4-read. **P2
-  and P4 must jointly satisfy a test:** two simultaneous appends to `IntentLog.md` do not
-  clobber — the write-temp-then-atomic-rename + `.lock` sentinel holds, and exactly one entry
-  ends marked `— Current`. This is the one mechanism spanning a Devin stream (P2) and the human
-  stream (P4); no stream is "done" until this test passes.
+  owns the test** — it lives at `tests/test_concurrent_write.py` and asserts: two simultaneous
+  appends to `IntentLog.md` do not clobber — the write-temp-then-atomic-rename + `.lock`
+  sentinel holds, and exactly one entry ends marked `— Current`. P4 must not add a second
+  atomic-write implementation; it imports the same utility P2 ships
+  (`vaultmind.notecreator.atomic_write`). No stream is "done" until this test passes.
