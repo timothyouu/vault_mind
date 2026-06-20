@@ -1,0 +1,11 @@
+{
+  "turn_id": "00893aaf-19fa-41d2-8238-0001",
+  "source_tool": "claude-code",
+  "session_id": "00893aaf-19fa-41d2-8238",
+  "transcript_path": "/home/user/.claude/projects/taskflow/transcript.jsonl",
+  "turn_text": {
+    "user": "How should we handle row-level access control? I want the DB to be the single source of truth for authorization.",
+    "assistant": "Let's use Supabase Row-Level Security (RLS) rather than checking ownership in every endpoint. That way the DB enforces authz at the data layer and we can't accidentally bypass it in app code.\n\nI'll enable RLS on all user-scoped tables and write policies for each operation. The key policy for the tasks table: `(auth.uid() = user_id OR auth.uid() IN (SELECT user_id FROM org_members WHERE org_id = tasks.org_id))`."
+  },
+  "enqueued_at": "2026-06-21T14:32:07-07:00"
+}

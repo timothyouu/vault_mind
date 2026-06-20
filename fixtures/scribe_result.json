@@ -1,0 +1,14 @@
+{
+  "turn_id": "00893aaf-19fa-41d2-8238-0001",
+  "source_tool": "claude-code",
+  "source_session": "00893aaf-19fa-41d2-8238",
+  "extractions": [
+    {
+      "type": "decision",
+      "title": "Use Supabase RLS for row-level auth",
+      "slug": "supabase-rls-policies",
+      "body": "Decided to enforce per-row access with Supabase Row-Level Security rather than\nchecking ownership in app code, so the DB is the single source of truth for authz.\n\n> \"let's just do RLS so we don't re-check ownership in every endpoint\""
+    }
+  ],
+  "intent_shift": null
+}
