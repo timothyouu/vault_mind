@@ -2,7 +2,7 @@
 
 > Source of truth for the technical build. Product/architecture rationale lives in the
 > proposal (`vaultmind_proposal.md` — PDF version, 20pp, the current one). This document
-> does not re-argue the product; it pins the **byte-level contracts** four people build against.
+> does not re-argue the product; it pins the **byte-level contracts** four sessions build against.
 
 ---
 
@@ -10,44 +10,57 @@
 
 The proposal settled the product and architecture. What it left as prose — "the hook drops
 turns into a lightweight queue," "finalize API contracts between the four agents," "define
-the `.md` node schema" — is exactly what blocks four people from building in parallel without
+the `.md` node schema" — is exactly what blocks four sessions from building in parallel without
 colliding.
 
 This spec's one job is **parallel-safe seams**: freeze every interface that crosses a
-person-boundary (queue format, agent message contracts, node + file schemas,
+session-boundary (queue format, agent message contracts, node + file schemas,
 `scanForSecrets` signature, hook configs, the live-event bus) into concrete shapes, so each
 owner builds and tests in isolation against mocks and integrates around hour 10 with no
 rework. Success = **nobody is ever blocked waiting on someone else's undecided interface**,
 and the seams are *demonstrated* working (Bucket 5), not merely documented.
 
-Everything off that path — per-person task clarity (→ `WORKSTREAMS.md`) and demo-path
+Everything off that path — per-session task clarity (→ `WORKSTREAMS.md`) and demo-path
 hardening (→ the late buckets) — is downstream of frozen seams, not a substitute for them.
 
 ---
 
 ## User
 
-Four owners, each in their own Claude Code session against this repo. What each needs from
-this spec to start at hour 0 without waiting on the others:
+Four parallel sessions against this repo — three Devin Cloud sessions (P1, P2, P3), one
+dedicated Devin session for the foundation (Buckets 2–4), and one human Claude Code session
+(P4). What each session needs from this spec:
 
-- **Owner A — Ingestion (P1).** Hooks, transcript reading, queue production, `SessionState.md`,
-  compaction/SessionEnd detection. Needs the `QueueItem` shape, the `SessionState.md` format,
-  and the fixture transcript to build against.
-- **Owner B — Extraction & writing (P2).** Scribe, Note Creator, IntentLog append, write-time
-  scan. Needs the node schema, the `QueueItem`/`ScribeResult`/`NodeWritten` contracts, the
-  IntentLog append contract, and `scanForSecrets`.
-- **Owner C — Linking & control plane / Fetch.AI (P3, whole).** Connector + Orchestrator uAgent
+- **Devin session — Foundation (Buckets 2–4).** Frozen contracts + fixtures, `scanForSecrets`,
+  runtime skeleton. Reads `SPEC.md` in full; hard-stop per bucket with human review before the
+  next begins. Bucket 5 (walking skeleton) is wired by this session and triggered live by the
+  team — passing it triggers the P1–P3 Devin sessions.
+- **Devin session P1 — Ingestion.** Hooks, transcript reading, queue production,
+  `SessionState.md`, compaction/SessionEnd detection. Needs the `QueueItem` shape, the
+  `SessionState.md` format, and the fixture transcript to build against.
+- **Devin session P2 — Extraction & writing.** Scribe, Note Creator, IntentLog append,
+  write-time scan. Needs the node schema, the `QueueItem`/`ScribeResult`/`NodeWritten`
+  contracts, the IntentLog append contract, and `scanForSecrets`.
+- **Devin session P3 — Linking & control plane / Fetch.AI.** Connector + Orchestrator uAgent
   (Agentverse, ASI:One, in-flight tracker) + handoff + Redis vector/memory. Needs the
   `NodeWritten`/`LinkResult`/`TurnProgress` contracts, the node + file schemas, the ASI:One
   intent definitions, and the fixture vault. **Heaviest, highest-stakes stream — owns the
   most-judged deliverable; task order front-loads the uAgent + ASI:One intents, with
   vector-search depth as the release valve if it slips (never the Agentverse publish).**
-- **Owner D — Web app (P4).** Needs the node schema, all four file formats, the
-  `NodeChangedEvent` enum, the five display states, and a fixture vault + mock events.
-  **Least blocked, longest runway.**
+  Human carve-outs (require account credentials — never hand to Devin): Agentverse
+  registration, ASI:One shared-chat URL, demo video.
+- **Human Claude Code session — Web app (P4).** Needs the node schema, all four file formats,
+  the `NodeChangedEvent` enum, the five display states, and a fixture vault + mock events.
+  **Sole human-driven stream — no Devin session. Deliberate: Best UI/UX is a judged prize
+  category that benefits from direct human taste.**
 
-Per-owner file ownership, mock strategies, the blocking timeline (as checkpoints, not
-deadlines), and suggested task order live in `WORKSTREAMS.md`.
+All Devin sessions follow: **hard-stop per bucket** (complete one bucket, post diff, halt until
+human approves + merges, then proceed); **halt-on-ambiguity** (if a contract appears
+underspecified or needs changing, stop and surface the question — never guess or invent an
+interface); **stay-in-lane** (touch only your session's owned files, never edit
+`contracts.py` / `types.ts` or another session's files). Per-session file ownership, mock
+strategies, the blocking timeline (as checkpoints, not deadlines), and suggested task order
+live in `WORKSTREAMS.md`.
 
 ---
 
@@ -155,7 +168,7 @@ Conventions: links live in each node's `related:` frontmatter as `[[basename]]`;
 - **Review Mode's checkpoint consumes this file**: a checkpoint fires when the web app opens,
   when a `session ended` row appears, or on explicit "review now."
 
-**Shared-write handling:** `IntentLog.md` (written by B's `ai-detected` path *and* D's
+**Shared-write handling:** `IntentLog.md` (written by P2's `ai-detected` path *and* P4's
 manual/handoff path) and `SessionState.md` use **one documented append contract** (prepend +
 strip/set Current) executed as **write-temp-then-atomic-rename guarded by a `.lock`
 sentinel**. Low-frequency, human-paced; the contract is named, not hoped for.
@@ -501,7 +514,7 @@ the project-wide standing rules that apply regardless of who's working — at mi
 - **Locking the Scribe's prompt or body-prose template** — that's the Scribe owner's call; the
   spec locks the I/O contract, not the wording.
 - **Building the four streams themselves** — these buckets deliver the shared foundation + docs;
-  the streams are the owners' work, guided by `WORKSTREAMS.md`.
+  the streams are the sessions' work, guided by `WORKSTREAMS.md`.
 
 ---
 
@@ -534,11 +547,12 @@ the project-wide standing rules that apply regardless of who's working — at mi
 
 ## Task Breakdown
 
-These five buckets are the **foundation for you and your team to build before the four streams
-diverge** — the shared docs + scaffolding that let the four owners start without waiting on each
-other. Each is completable and reviewable independently; don't start the next until the previous
-is done. Bucket 1's three docs (`SPEC.md`, `WORKSTREAMS.md`, `CLAUDE.md`) already exist — this is
-them; Buckets 2–5 remain. The four streams follow afterward, per `WORKSTREAMS.md`.
+These five buckets establish the shared foundation before the four streams begin. Bucket 1
+(this doc set) is already done. **Buckets 2–4 are executed by a dedicated Devin session** —
+same hard-stop-per-bucket rules as P1–P3, human review required before each next bucket begins.
+**Bucket 5 is Devin-wired but human-witnessed** — the full team observes the live fire together,
+and passing it is the single gate that triggers the P1–P3 Devin sessions. The four streams
+follow afterward, per `WORKSTREAMS.md`.
 
 - **Bucket 1 — Project docs.** `WORKSTREAMS.md` + `CLAUDE.md`, and commit `SPEC.md` alongside.
   All three files land here. `CLAUDE.md` stays short (points to the other two + the standing

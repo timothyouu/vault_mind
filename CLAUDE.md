@@ -7,8 +7,8 @@ writes a git-native vault as you work; a trust UI lets you review and hand off.
 ## Read these first (don't re-derive them)
 - **`SPEC.md`** — the technical contract: node schema, the six agent message contracts, the four
   file formats, `scanForSecrets`, hook configs, the session-end resolution, and the buckets.
-- **`WORKSTREAMS.md`** — who owns what, what's mockable in isolation, when each seam goes live
-  (checkpoints, not deadlines), and per-owner task order. Find your stream here.
+- **`WORKSTREAMS.md`** — who runs what session, what's mockable in isolation, when each seam goes
+  live (checkpoints, not deadlines), and per-session task order. Find your stream here.
 
 ## Standing rules (everyone, always)
 1. **Never let a downstream LLM touch the Scribe's content.** The Note Creator wraps the Scribe's
@@ -30,3 +30,15 @@ writes a git-native vault as you work; a trust UI lets you review and hand off.
 Python pipeline + hooks + Orchestrator (a published Fetch.AI uAgent); TypeScript / Next.js
 full-stack web app. Redis = queue (Streams) + event bus (pub/sub) + vector memory. Arize across
 all agents. The only cross-language seams are `vault/*.md` on disk and Redis.
+
+## Devin execution rules (foundation Buckets 2–4, and streams P1, P2, P3)
+- **Hard-stop per bucket.** Complete exactly one bucket, post the diff, and halt until a human
+  approves and merges via Devin Review. Do not begin the next bucket without that approval.
+- **Halt-on-ambiguity.** If a bucket is underspecified or a frozen contract appears to need
+  changing, stop and surface the question. Never guess or invent an interface.
+- **Stay-in-lane.** Touch only your session's owned files. Never edit `contracts.py` /
+  `types.ts` or another session's files.
+- **No account or publish credentials.** Agentverse registration, the ASI:One shared-chat URL,
+  and the demo video are human-owned tasks. Never request or use account credentials.
+- **ACU-awareness.** Each session has a soft-cap budget. If you approach it, surface the alert
+  and await human approval before drawing from the shared reserve.

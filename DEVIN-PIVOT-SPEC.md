@@ -13,8 +13,8 @@
 
 | Who | Surface | Does what | Draws Devin ACUs? |
 |---|---|---|---|
-| **Devin** (3 parallel Cloud sessions) | Devin Cloud | **Executes** — writes the code for streams **P1, P2, P3**, one bucket at a time, unattended between boundaries, subagents allowed *within* a bucket | **Yes** (the ~266 pool) |
-| **Humans** (the team) | Devin Review + Claude Code | **Review** every Devin bucket via Devin Review (approve + merge before the next bucket starts); **build the foundation** (Claude Code session); **build P4** (Claude Code session); own the **carve-outs** (Agentverse, ASI:One URL, demo video, the witnessed Bucket-5 gate, integration) | No |
+| **Devin** (4 sessions: foundation + P1 + P2 + P3) | Devin Cloud | **Executes** — writes the code for foundation Buckets 2–4 and streams P1, P2, P3, one bucket at a time, unattended between boundaries, subagents allowed *within* a bucket | **Yes** (the ~266 pool) |
+| **Humans** (the team) | Devin Review + Claude Code | **Review** every Devin bucket via Devin Review (approve + merge before the next bucket starts); **witness Bucket 5** live fire; **build P4** (Claude Code session); own the **carve-outs** (Agentverse, ASI:One URL, demo video, integration) | No |
 
 **"Devin Review" is the interface a *human* reviews through — it is not Devin reviewing itself.**
 Devin is the executor; the human is the reviewer.
@@ -25,7 +25,7 @@ Devin is the executor; the human is the reviewer.
 
 Today `SPEC.md` and `WORKSTREAMS.md` assume a human types every bucket of every stream — "four
 owners, each in their own Claude Code session," buckets reviewed by the person who wrote them. The
-proposal changed that: **streams P1–P3 are now executed by three parallel, unattended Devin Cloud
+proposal changed that: **streams P1–P3 and foundation Buckets 2–4 are now executed by Devin Cloud
 sessions; only P4 stays human-driven.**
 
 After this revision, the three build docs describe *that* world and only that world:
@@ -35,11 +35,12 @@ After this revision, the three build docs describe *that* world and only that wo
   merges via Devin Review before the next bucket begins.
 - **P4** is built by a human in Claude Code, with **no Devin session**, deliberately — UI/UX is a
   judged general-prize category (Best UI/UX) that benefits from direct human taste and iteration.
-- The **foundation** (existing Buckets 1–5) is built in a **human Claude Code session** — agent-
-  drafted from the already-frozen SPEC and human-reviewed (Buckets 2–4), with Bucket 5 an inherently
-  human-run, witnessed live fire. The foundation draws **zero Devin ACUs**, and its Bucket-5 gate is
-  what **triggers** the P1–P3 Devin sessions.
-- The work is governed by a **fixed ~266-ACU credit pool** ($600) shared across **P1–P3 only**.
+- **Foundation Buckets 2–4** are also executed by a dedicated Devin session — same hard-stop-per-
+  bucket rules, human review at each boundary. Bucket 1 (this doc set) is already done. **Bucket 5
+  is Devin-wired and human-witnessed** — the team observes the live fire together; passing it
+  triggers the P1–P3 sessions.
+- The work is governed by a **fixed ~266-ACU credit pool** ($600) shared across **P1–P3 and the
+  foundation session**.
 
 The byte-level contracts that made the seams parallel-safe for four humans are **unchanged** — and
 are now the precondition that makes unattended cloud execution safe (an ambiguous spec is fine when a
@@ -65,8 +66,9 @@ stream, what changed vs. stayed the same:
   noted; **stream code unchanged in scope** (same deliverables, new executor).
 - **P4:** executor **unchanged** (human Claude Code, no Devin); framing/labels updated; integration
   notes added.
-- **Foundation (Buckets 1–5):** executor defined as **human Claude Code session** (agent-drafted +
-  human-reviewed for 2–4; human-run for 5); not Devin.
+- **Foundation (Buckets 2–4):** executor → **dedicated Devin session** (same hard-stop-per-bucket
+  rules as P1–P3; human review at each boundary). Bucket 1 already done. Bucket 5 Devin-wired,
+  human-witnessed.
 
 **AC-2 — "Bucket approval" is defined for a Devin executor.** The docs define it as **hard-stop per
 bucket**: a Devin session completes exactly one bucket (subagents permitted *within* the bucket),
@@ -78,21 +80,21 @@ Review.** The definition includes:
   contracts (`contracts.py` / `types.ts`) or another stream's files.
 
 **AC-3 — Concrete ACU allocation** against the confirmed **$600 / ~266-ACU** pool ($2.25/ACU,
-~15 min active compute/ACU), **across P1–P3 only:**
+~15 min active compute/ACU), **across P1–P3 and the foundation session:**
 
 | Stream | Share | ACUs | Soft-cap alert |
 |---|---|---|---|
-| P3 — Linking + Orchestrator (heaviest, most-judged) | 40% | 106 | ~85 |
-| P2 — Extraction & writing | 22% | 58 | ~46 |
-| P1 — Ingestion (front-loaded, stable) | 18% | 48 | ~38 |
-| Shared reserve (tail / re-runs / integration) | 20% | 54 | human-approved draw only |
+| P3 — Linking + Orchestrator (heaviest, most-judged) | 38% | 101 | ~81 |
+| P2 — Extraction & writing | 21% | 56 | ~45 |
+| P1 — Ingestion (front-loaded, stable) | 17% | 45 | ~36 |
+| Foundation — Buckets 2–4 (contracts, secrets, skeleton) | 7% | ~19 | ~15 |
+| Shared reserve (tail / re-runs / integration) | 17% | 45 | human-approved draw only |
 | **P4 — Web app** | — | **0** | n/a (human) |
 
 Governance: a soft cap = the stream's allocation; at ~80% the human reviewer is alerted (burn-
 monitoring); continuing past it requires **human approval to draw from the reserve** (so no stream
 silently starves another); a session that would exceed even the reserve is **paused at its next
-Devin Review boundary**, where the owner may finish that bucket **by hand** to conserve ACUs. The
-foundation and P4 consume **no** ACUs (Claude Code sessions). The binding risk is the *tail* — a
+Devin Review boundary**, where the owner may finish that bucket **by hand** to conserve ACUs. P4 consumes **no** ACUs (human Claude Code session). The binding risk is the *tail* — a
 runaway/looping session or repeated re-runs, amplified by in-bucket subagents burning concurrently —
 not the average; the caps target the tail.
 
@@ -113,16 +115,15 @@ points to `SPEC.md` / `WORKSTREAMS.md` (no duplicated content).
 reviewer can diff those sections and confirm they are byte-unchanged. The revision states *why* they
 are untouched: they are the precondition that makes unattended Devin execution safe.
 
-**AC-7 — Foundation executor + the trigger gate are explicit.** The docs state: the foundation is a
-**human Claude Code session**; Buckets 2–4 are agent-drafted + human-reviewed, each gated on a diff-
-review against the relevant AC **plus two deterministic checks** — **`contracts.py`↔`types.ts` field
-parity** and **every fixture node parsing against AC-1**; and **Bucket 5 (the witnessed live fire) is
-the single gate that triggers all three P1–P3 Devin sessions** (sessions are triggered by this gate,
-not by a clock hour). Bucket 5 runs **before any Devin session exists**, so it cannot verify
-Devin-built code directly; instead it **locks the contract-conformance gate** — the two deterministic
-checks above plus the seam wiring it proves live — which is then **re-run on each Devin diff at that
-stream's Devin Review boundary**, so every Devin-built component is verified against the frozen
-contracts as its bucket lands.
+**AC-7 — Foundation executor + the trigger gate are explicit.** The docs state: foundation Buckets
+2–4 are executed by a **dedicated Devin session** (same hard-stop-per-bucket rules as P1–P3; human
+review at each boundary); each bucket is gated on a diff-review against the relevant AC **plus two
+deterministic checks** — **`contracts.py`↔`types.ts` field parity** and **every fixture node parsing
+against AC-1**; and **Bucket 5 (Devin-wired, human-witnessed live fire) is the single gate that
+triggers all three P1–P3 Devin sessions** (sessions are triggered by this gate, not by a clock
+hour). The two deterministic checks that gate Bucket 5 **are then re-run on each P1–P3 Devin diff
+at that stream's Devin Review boundary**, so every Devin-built component is continuously verified
+against the frozen contracts as its bucket lands.
 
 ## Out of Scope
 
@@ -155,9 +156,9 @@ pipeline/hooks/Orchestrator + TypeScript/Next.js full-stack web app; the only cr
 are `vault/*.md` on disk and Redis.
 
 **New, locked:**
-- **Devin Cloud + Devin Review = the execution/review layer for P1, P2, P3 only.** Devin executes;
-  humans review via Devin Review.
-- **$600 / ~266-ACU shared pool** across P1–P3 (allocation in AC-3).
+- **Devin Cloud + Devin Review = the execution/review layer for foundation Buckets 2–4, P1, P2, and
+  P3.** Devin executes; humans review via Devin Review.
+- **$600 / ~266-ACU shared pool** across foundation + P1–P3 (allocation in AC-3).
 - **Hard-stop per bucket**; **subagents permitted within a bucket**; **halt-on-ambiguity** +
   **stay-in-lane** (AC-2).
 - **Mocks-first + minimal scoped keys** for Devin environments (P2 → `ANTHROPIC_API_KEY`; P3 → local
@@ -165,8 +166,10 @@ are `vault/*.md` on disk and Redis.
 
 **New, locked (exclusions):**
 - **P4 is never executed by Devin** (human Claude Code session).
-- **The foundation (Buckets 1–5) is never a Devin session** (human Claude Code; agent-drafted +
-  human-reviewed for 2–4; Bucket 5 human-run). Zero ACUs.
+- **Bucket 1 (the doc set) is already done.** Foundation Buckets 2–4 are a Devin session; Bucket 5
+  is Devin-wired and human-witnessed.
+- **Agentverse registration, the ASI:One shared-chat URL, and the demo video are human-owned** —
+  they require account credentials and are never handed to Devin.
 
 ## Task Breakdown
 
@@ -179,7 +182,7 @@ approved; at each boundary, summarize what was done and wait for confirmation.
   a-bucket, the human/Devin boundary + carve-outs, the foundation-vs-stream executor split, and the
   "Devin Review = a human reviews Devin's output" clarification.
 - Reframe **§Goal** (person-boundary → session-boundary) and **§User** (session executors: Devin for
-  P1–P3, human Claude Code for P4 and for the foundation).
+  foundation Buckets 2–4 and P1–P3; human Claude Code for P4 only).
 - Update the **§Task Breakdown** intro + **Bucket-5 Definition of Done** so that (a) Bucket 5 is the
   explicit gate that triggers the P1–P3 Devin sessions and (b) it **establishes the
   contract-conformance gate** (the two deterministic checks + the proven seam wiring) that is then
