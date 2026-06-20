@@ -242,7 +242,7 @@ A Connector crash after the Note Creator writes must not leave a silently-orphan
   Entries List, reclaimed via `XAUTOCLAIM` on restart. Turns are never silently dropped.
 - **The Orchestrator notices.** It consumes `TurnProgress` and keeps an in-flight table
   `{turn_id → last stage + ts}`. A turn at `written` but not `done` past a timeout is flagged
-  **`stuck`** → Sentry + project state.
+  **`stuck`** → Arize + project state.
 - **Idempotent resume.** Per-turn marker `vaultmind:turn:<turn_id>` records `stage + node_ids`;
   redelivery resumes from the last completed stage (node id derives from the fixed
   `enqueued_at`, stable across retries). No duplicate nodes.
@@ -406,7 +406,7 @@ the project-wide standing rules that apply regardless of who's working — at mi
 
 ## Out of Scope
 
-- **Stretch handoff targets:** Devin REST-API integration; Deepgram voice review/logging.
+- **Stretch handoff targets:** Devin REST-API integration.
 - **Dynamic `VaultIndex.md`** (BFS "most-relevant-now" traversal) — the static map ships; the
   dynamic variant is stretch only.
 - **Vector-search depth/tuning** beyond basic Redis vector retrieval — the Connector ships on
@@ -431,7 +431,7 @@ the project-wide standing rules that apply regardless of who's working — at mi
 - **Fetch.AI uAgents + Agentverse + ASI:One** — the **Orchestrator** is a real, published
   uAgent with the Chat Protocol, discoverable/usable via ASI:One. (uAgent built locally from
   hour 0; Agentverse publish is the late-but-mandatory deliverable.)
-- **Sentry** — error monitoring wired across the pipeline (Scribe, Note Creator, Connector,
+- **Arize** — LLM observability wired across the pipeline (Scribe, Note Creator, Connector,
   Orchestrator) and the web app server. Cross-cutting, not a separate stream.
 - **Claude Code + Codex** — the two tracked surfaces, via their `Stop`/`SessionEnd` hooks.
 
@@ -470,7 +470,7 @@ them; Buckets 2–5 remain. The four streams follow afterward, per `WORKSTREAMS.
 
 - **Bucket 4 — Runtime skeleton.** Redis (docker-compose); the two hook configs; the
   watcher-loop skeleton (consumer-group + ACK + idempotency + `TurnProgress`, with stubbed
-  plug-in points for Scribe/NoteCreator/Connector); the Sentry init wrapper;
+  plug-in points for Scribe/NoteCreator/Connector); the Arize init wrapper;
   `npm run vaultmind:start`.
 
 - **Bucket 5 — Walking skeleton (seam proof).** Stubs wired end-to-end so the seams are

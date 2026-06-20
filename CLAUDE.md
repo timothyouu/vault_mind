@@ -28,5 +28,5 @@ writes a git-native vault as you work; a trust UI lets you review and hand off.
 
 ## Stack
 Python pipeline + hooks + Orchestrator (a published Fetch.AI uAgent); TypeScript / Next.js
-full-stack web app. Redis = queue (Streams) + event bus (pub/sub) + vector memory. Sentry across
+full-stack web app. Redis = queue (Streams) + event bus (pub/sub) + vector memory. Arize across
 all agents. The only cross-language seams are `vault/*.md` on disk and Redis.

@@ -124,14 +124,14 @@ frozen contracts.
 ## Out of Scope
 
 - **Any change to `SPEC.md` AC-1…AC-8 or the Stack & Constraints non-negotiables** (Redis, Fetch.AI
-  uAgents/Agentverse/ASI:One, Sentry, Claude Code + Codex hooks). Not reopened.
+  uAgents/Agentverse/ASI:One, Arize, Claude Code + Codex hooks). Not reopened.
 - **A Devin session for P4.** Explicitly excluded.
 - **Devin as an in-product handoff target** (the old Devin REST-API third handoff target alongside
   Gemini / a fresh Claude Code session) — already dropped; stays out (it was a stretch/out-of-scope
   item).
 - **Re-deciding the Karpathy bucket method or the product architecture.**
 - **Building or executing the streams themselves.** This revision edits docs only.
-- **Stretch items** — dynamic `VaultIndex.md`, Deepgram voice, vector-search depth tuning — unchanged.
+- **Stretch items** — dynamic `VaultIndex.md`, vector-search depth tuning — unchanged.
 - **Editing the proposal PDF / Google Doc itself.** Its residual P4-in-Devin language (the stream
   table lists P4 with a "Devin session scope" column; the prose says "P2 and P4 similarly start
   immediately") contradicts the locked "P4 never Devin" decision — this is **flagged as an out-of-
@@ -141,7 +141,7 @@ frozen contracts.
 
 **Unchanged (not reopened):** Redis (queue Streams + event bus pub/sub + vector memory); Fetch.AI
 uAgents + Agentverse + ASI:One (the Orchestrator is the published uAgent with the Chat Protocol);
-Sentry across the pipeline + web-app server; Claude Code + Codex `Stop`/`SessionEnd` hooks; Python
+Arize across the pipeline + web-app server; Claude Code + Codex `Stop`/`SessionEnd` hooks; Python
 pipeline/hooks/Orchestrator + TypeScript/Next.js full-stack web app; the only cross-language seams
 are `vault/*.md` on disk and Redis.
 

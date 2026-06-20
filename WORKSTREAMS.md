@@ -119,15 +119,15 @@ beat*, not a number nobody looks at.
   block beat → receiving agent reads the vault. Also drive it through the ASI:One conversation
   (Intent A → B-blocked → fix → B-ready → C).
 - **Hr 20–24 — polish / sponsor deliverables.** Agentverse publish + ASI:One shared chat URL +
-  Agentverse profile URL + dedicated demo video (C — **mandatory**); Sentry dashboards; vector
-  depth (release valve); merge-conflict polish; pitch deck. Out-of-scope items (Devin, Deepgram,
+  Agentverse profile URL + dedicated demo video (C — **mandatory**); Arize dashboards; vector
+  depth (release valve); merge-conflict polish; pitch deck. Out-of-scope items (Devin,
   dynamic VaultIndex) only if everything else is done.
 
 ---
 
 ## Cross-cutting (everyone, not a fifth stream)
 
-- **Sentry** — wrap your own failure points as you build: A (hook/queue errors), B
+- **Arize** — wire LLM observability across your own failure points as you build: A (hook/queue errors), B
   (extraction/write), C (connector/uAgent/handoff), D (server routes). Dashboards are hr 20–24.
 - **`scanForSecrets` is never skipped** — write-time before any disk write (B), commit-time
   (pre-commit hook), handoff-time before exposing the vault (C, and the web app via subprocess).
