@@ -118,8 +118,11 @@ are untouched: they are the precondition that makes unattended Devin execution s
 review against the relevant AC **plus two deterministic checks** — **`contracts.py`↔`types.ts` field
 parity** and **every fixture node parsing against AC-1**; and **Bucket 5 (the witnessed live fire) is
 the single gate that triggers all three P1–P3 Devin sessions** (sessions are triggered by this gate,
-not by a clock hour). Bucket 5's DoD additionally verifies that Devin-built components conform to the
-frozen contracts.
+not by a clock hour). Bucket 5 runs **before any Devin session exists**, so it cannot verify
+Devin-built code directly; instead it **locks the contract-conformance gate** — the two deterministic
+checks above plus the seam wiring it proves live — which is then **re-run on each Devin diff at that
+stream's Devin Review boundary**, so every Devin-built component is verified against the frozen
+contracts as its bucket lands.
 
 ## Out of Scope
 
@@ -136,6 +139,12 @@ frozen contracts.
   table lists P4 with a "Devin session scope" column; the prose says "P2 and P4 similarly start
   immediately") contradicts the locked "P4 never Devin" decision — this is **flagged as an out-of-
   band fix for the proposal owner**, not fixed in these three files.
+  - **Second out-of-band flag (Arize call sites):** the proposal (Agent Architecture / Why This
+    Wins) calls the Connector's link-relevance an "LLM call site." `SPEC.md` ships the Connector
+    **heuristic-first (vector as the release valve)**, so it is not an LLM call; the one end-to-end
+    evaluator (`SPEC.md` AC-4b) still scores `link_relevance` against the Connector's *output*. The
+    proposal wording should say the evaluator *judges* link relevance, not that the Connector is an
+    LLM — flagged for the proposal owner, resolved on the spec side, no contract change.
 
 ## Stack & Constraints
 
@@ -172,8 +181,11 @@ approved; at each boundary, summarize what was done and wait for confirmation.
 - Reframe **§Goal** (person-boundary → session-boundary) and **§User** (session executors: Devin for
   P1–P3, human Claude Code for P4 and for the foundation).
 - Update the **§Task Breakdown** intro + **Bucket-5 Definition of Done** so that (a) Bucket 5 is the
-  explicit gate that triggers the P1–P3 Devin sessions and (b) it verifies Devin-built components
-  against the frozen contracts, plus record the two deterministic foundation checks.
+  explicit gate that triggers the P1–P3 Devin sessions and (b) it **establishes the
+  contract-conformance gate** (the two deterministic checks + the proven seam wiring) that is then
+  **re-applied to each Devin bucket at Devin Review** — Bucket 5 runs before Devin starts, so it
+  *sets up* that verification rather than performing it on Devin output — plus record the two
+  deterministic foundation checks.
 - Add the **"AC-1…AC-8 unchanged, and why"** note.
 
 **Bucket 2 — Revise `WORKSTREAMS.md` in place.**

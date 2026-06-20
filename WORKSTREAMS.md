@@ -4,7 +4,7 @@ How to read this: `SPEC.md` is the contract (schemas, the six message shapes, `s
 hook configs). This file is **who owns what, what each can build in isolation, when each seam
 goes live, and the order to work in.** When in doubt about a shape, SPEC.md wins.
 
-Paths are relative to the tool repo root (`/home/timmy/vault-mind`, which *is* `vaultmind-cli`;
+Paths are relative to the tool repo root (`/home/tim/vault_mind`, which *is* `vaultmind-cli`;
 it installs into a user's project as `.vaultmind/`). The exact tree is finalized in Bucket 2;
 the package is `vaultmind/`, the web app is `webapp/`, shared fixtures live in `fixtures/`.
 

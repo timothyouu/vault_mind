@@ -1,7 +1,7 @@
 # Spec: VaultMind Technical Implementation
 
 > Source of truth for the technical build. Product/architecture rationale lives in the
-> proposal (`vaultmind_proposal.md` — PDF version, 18pp, the current one). This document
+> proposal (`vaultmind_proposal.md` — PDF version, 20pp, the current one). This document
 > does not re-argue the product; it pins the **byte-level contracts** four people build against.
 
 ---
@@ -249,6 +249,89 @@ A Connector crash after the Note Creator writes must not leave a silently-orphan
 - **Disk is the backstop.** An orphan has `related: []` — visibly isolated in the graph; a
   startup reconciliation pass re-links any node with empty `related`.
 
+#### AC-4b — End-to-end pipeline evaluator (Arize eval track)
+
+**What it judges.** **One** LLM-as-judge evaluator runs after each complete turn (`done` stage)
+and scores the **whole chain** end-to-end — extraction → linking → consistency — against the
+original turn text and the resulting vault state. This is the proposal's "one evaluator that
+watches the whole pipeline rather than three separate ones per call site." It scores on three
+axes (extraction itself contributes two sub-scores):
+
+| axis | stage judged | question | scale |
+|---|---|---|---|
+| **recall** | Scribe | Did the Scribe surface every noteworthy decision / constraint / goal / question a human reviewer would flag? | 0–1 float |
+| **precision** | Scribe | Are the extracted nodes warranted by the turn text, or did the Scribe hallucinate / over-extract? | 0–1 float |
+| **link_relevance** | Connector | Are the `related` wikilinks the Connector created actually warranted, or did it link unrelated nodes? | 0–1 float |
+| **grounding** | downstream | Does the written node + its links stay consistent with what's actually in the vault, or did something drift from the source? (1 = fully grounded) | 0–1 float |
+
+`extraction_quality` = harmonic mean of recall + precision (the Scribe sub-score). The headline
+metric is **`pipeline_quality`** = harmonic mean of the three axes
+(`extraction_quality`, `link_relevance`, `grounding`).
+
+> **Connector is judged, not assumed-LLM.** The Connector ships heuristic-first (vector as the
+> release valve — see Stack & Constraints / Out of Scope), so `link_relevance` scores the
+> Connector's *output*, not an LLM
+> call inside it. The evaluator measures link quality regardless of how the links were produced.
+
+**Where the prompt lives.** `vaultmind/evals/pipeline_eval_prompt.md`, bundled inside the
+`vaultmind` Python package (loaded via `importlib.resources`, same pattern as
+`secret-patterns.json`). The prompt is the single source of truth — never inline a copy. It
+receives, for the completed turn: the verbatim `turn_text` from the `QueueItem`; the list of
+extracted `(type, title, body)` tuples from the `ScribeResult`; the `related` wikilinks from the
+`LinkResult`; and the titles/bodies of the linked-to nodes (read from disk so `grounding` is
+judged against real vault state, not a claim). It returns structured JSON:
+
+```json
+{
+  "recall": 0.85,
+  "precision": 1.0,
+  "extraction_quality": 0.92,
+  "link_relevance": 0.80,
+  "grounding": 1.0,
+  "pipeline_quality": 0.89,
+  "missed": ["the constraint about not logging PII was present but not captured"],
+  "spurious": [],
+  "bad_links": []
+}
+```
+
+`missed`, `spurious`, and `bad_links` are human-readable strings — they surface in Arize spans
+and are the basis for prompt iteration, not downstream logic.
+
+**How it wires into Arize.** The evaluator runs as a child span of the existing `turn` trace
+(the same trace that carries stuck-detection flags). Scores are logged as span attributes:
+`eval.recall`, `eval.precision`, `eval.extraction_quality`, `eval.link_relevance`,
+`eval.grounding`, `eval.pipeline_quality`. The `missed` / `spurious` / `bad_links` lists are
+logged as a JSON attribute `eval.detail`. This means every Arize turn trace already shows the
+failure-visibility signals (AC-4) *and* the end-to-end pipeline-quality score in one view — no
+separate dashboard.
+
+**Before / after improvement deliverable.** The polish-hours checklist item is fulfilled by:
+1. Running the evaluator against the **fixture vault** (Bucket 2) with the initial Scribe prompt
+   and Connector linking logic → log baseline `pipeline_quality` (and the per-axis scores) to Arize.
+2. After any iteration on the **live** Scribe prompt *or* Connector linking logic, re-running
+   against the same fixture → Arize's trace comparison surfaces the delta on whichever axis moved.
+3. The demo beat: show the Arize dashboard with at least two runs visible so judges can read the
+   before/after `pipeline_quality` trend (and the axis that improved) without narration.
+
+**"Iteration" means the live system, not a demo copy.** The Scribe's prompt and the Connector's
+linking logic are what the production pipeline loads/runs at runtime (owners B and C own the exact
+paths, but one file/one implementation each, no forks). The evaluator scores those; if an axis is
+low, you edit that real artifact and re-run; the Arize delta reflects a real improvement to the
+shipped system. A parallel "eval-only" copy is explicitly prohibited — it would make the
+before/after comparison a rehearsed artifact rather than evidence, and judges can ask "is this what
+it actually runs?"
+
+**Constraints:**
+- The evaluator is **read-only and fire-and-forget** — it never edits nodes or feeds back into
+  the pipeline. A low score is an observability signal, not a retry trigger.
+- It runs **after** `XACK` (the turn is already committed to disk); a slow judge never stalls
+  the hot path.
+- **One evaluator, one prompt file** watching the whole chain. Do **not** split it into per-agent
+  sub-evaluators (one for the Scribe, one for the Connector) — the proposal's whole "one pass,
+  covering the whole process" claim is the deliverable; the single turn-level `pipeline_quality`
+  score with its per-axis breakdown is how that one evaluator stays end-to-end.
+
 ### AC-5 — `scanForSecrets` (signature + three call sites)
 
 **One Python implementation, period.** (The Orchestrator already runs the handoff scan for
@@ -431,8 +514,11 @@ the project-wide standing rules that apply regardless of who's working — at mi
 - **Fetch.AI uAgents + Agentverse + ASI:One** — the **Orchestrator** is a real, published
   uAgent with the Chat Protocol, discoverable/usable via ASI:One. (uAgent built locally from
   hour 0; Agentverse publish is the late-but-mandatory deliverable.)
-- **Arize** — LLM observability wired across the pipeline (Scribe, Note Creator, Connector,
-  Orchestrator) and the web app server. Cross-cutting, not a separate stream.
+- **Arize** — LLM observability wired across the whole pipeline and the web-app server, plus the
+  one end-to-end evaluator (AC-4b). The genuine **LLM calls** — the Scribe's extraction, the
+  Orchestrator's ASI:One replies, and the evaluator's own judge call — are traced as LLM spans;
+  the deterministic/heuristic steps (Note Creator write, Connector linking, hooks) are traced as
+  plain spans whose *output* the evaluator scores. Cross-cutting, not a separate stream.
 - **Claude Code + Codex** — the two tracked surfaces, via their `Stop`/`SessionEnd` hooks.
 
 **Open — recommended and adopted:**
