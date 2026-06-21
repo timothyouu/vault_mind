@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "vaultmind:start": "bash scripts/start.sh",
+    "vaultmind:start": "powershell -ExecutionPolicy Bypass -File scripts/start.ps1",
     "dev": "cd webapp && npm run dev"
   }
 }

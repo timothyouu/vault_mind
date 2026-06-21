@@ -15,6 +15,9 @@ webapp/.next/
 vault/
 *.lock
 
+# Certificates / secrets
+*.pem
+
 # Env
 .env
 .env.local
