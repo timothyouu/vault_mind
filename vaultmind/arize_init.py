@@ -35,6 +35,10 @@ ATTR_EVAL_GROUNDING      = "eval.grounding"
 ATTR_EVAL_PIPELINE_Q     = "eval.pipeline_quality"
 ATTR_EVAL_DETAIL         = "eval.detail"
 
+SPAN_STAGE_SCRIBE       = "stage.scribe"
+SPAN_STAGE_NOTECREATOR  = "stage.notecreator"
+SPAN_STAGE_CONNECTOR    = "stage.connector"
+
 ARIZE_PROJECT = "vaultmind"
 
 
