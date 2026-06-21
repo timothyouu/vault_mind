@@ -31,21 +31,25 @@ def main() -> None:
         sys.stderr.write(f"on_stop.py: import error: {exc}\n")
         sys.exit(0)
 
-    last_uuid = _cursor.load(session_id)
-    turns, flags = _reader.parse(transcript_path, last_uuid)
+    try:
+        last_uuid = _cursor.load(session_id)
+        turns, flags = _reader.parse(transcript_path, last_uuid)
 
-    for t in turns:
-        _producer.enqueue(
-            t.turn_text, session_id, transcript_path,
-            SourceTool.claude_code, redis_url,
-        )
+        for t in turns:
+            _producer.enqueue(
+                t.turn_text, session_id, transcript_path,
+                SourceTool.claude_code, redis_url,
+            )
 
-    if turns:
-        try:
-            _cursor.save(session_id, turns[-1].uuid)
-        except Exception as exc:
-            sys.stderr.write(f"on_stop.py: cursor save failed: {exc}\n")
-        _ss.turn_enqueued(session_id, len(turns), flags)
+        if turns:
+            try:
+                _cursor.save(session_id, turns[-1].uuid)
+            except Exception as exc:
+                sys.stderr.write(f"on_stop.py: cursor save failed: {exc}\n")
+            _ss.turn_enqueued(session_id, len(turns), flags)
+
+    except Exception as exc:
+        sys.stderr.write(f"on_stop.py: unexpected error: {exc}\n")
 
     sys.exit(0)
 
