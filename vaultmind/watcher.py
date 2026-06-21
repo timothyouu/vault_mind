@@ -413,16 +413,11 @@ def _process_message(
     ACKs ONLY after the complete chain succeeds (AC-4).
     On any exception: publish failed progress, do NOT ACK, log and return.
     """
-    # Deserialize QueueItem from Redis Stream fields.
-    # Redis Stream XADD serialises nested objects as JSON strings on the way in
-    # (see the P1 producer); we reconstruct from the raw fields dict.
+    # Deserialize QueueItem.
     try:
-        # The stream field 'data' holds the full JSON payload, or fields are
-        # individual keys — support both formats (producer detail is P1-owned).
         if "data" in fields:
             raw = json.loads(fields["data"])
         else:
-            # Fields are individual keys; turn_text is nested JSON.
             raw = dict(fields)
             if isinstance(raw.get("turn_text"), str):
                 raw["turn_text"] = json.loads(raw["turn_text"])
@@ -430,15 +425,11 @@ def _process_message(
         qi = QueueItem.model_validate(raw)
     except Exception as exc:
         logger.error("Failed to deserialize QueueItem from msg %s: %s", msg_id, exc)
-        # Cannot publish progress without a turn_id; just log and do NOT ACK.
-        # The message stays in PEL and will be retried.
         return
 
     turn_id = qi.turn_id
 
-    # ------------------------------------------------------------------
-    # Idempotency guard: if this turn already completed, ACK and skip.
-    # ------------------------------------------------------------------
+    # Idempotency guard.
     prior_stage = _get_stage(r, turn_id)
     if prior_stage == TurnStage.done.value:
         logger.info("Turn %s already done (idempotency); ACKing msg %s", turn_id, msg_id)
@@ -447,68 +438,69 @@ def _process_message(
 
     logger.info("Processing turn %s (msg %s)", turn_id, msg_id)
 
-    # ------------------------------------------------------------------
-    # Stage: started
-    # ------------------------------------------------------------------
     _publish_progress(r, turn_id, TurnStage.started)
     _set_stage(r, turn_id, TurnStage.started.value)
 
-    try:
-        # ----------------------------------------------------------------
-        # Stage: Scribe extraction
-        # ----------------------------------------------------------------
-        scribe_result = SCRIBE_FN(qi)
+    _tracer = tracer if tracer is not None else otel_trace.get_tracer(SERVICE_PIPELINE)
 
-        extracted_ids = [
-            f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d-%H%M')}"
-            f"-{ext.slug}"
-            for ext in scribe_result.extractions
-        ]
-        _publish_progress(r, turn_id, TurnStage.extracted, node_ids=extracted_ids)
-        _set_stage(r, turn_id, TurnStage.extracted.value, node_ids=extracted_ids)
+    # Pre-declare so they're accessible after the try/except for the eval call.
+    nodes_written: list[NodeWritten] = []
+    link_results: list[LinkResult] = []
+    scribe_result: ScribeResult | None = None
 
-        # ----------------------------------------------------------------
-        # Stage: NoteCreator — write .md files
-        # ----------------------------------------------------------------
-        nodes_written: list[NodeWritten] = NOTE_CREATOR_FN(scribe_result, vault_root)
+    with _tracer.start_as_current_span(SPAN_TURN) as turn_span:
+        turn_span.set_attribute(ATTR_TURN_ID, turn_id)
 
-        written_ids = [nw.id for nw in nodes_written]
-        _publish_progress(r, turn_id, TurnStage.written, node_ids=written_ids)
-        _set_stage(r, turn_id, TurnStage.written.value, node_ids=written_ids)
+        try:
+            # Stage: Scribe extraction
+            with _tracer.start_as_current_span(SPAN_STAGE_SCRIBE):
+                scribe_result = SCRIBE_FN(qi)
 
-        # ----------------------------------------------------------------
-        # Stage: Connector — populate related, publish node-changed
-        # ----------------------------------------------------------------
-        link_results: list[LinkResult] = []
-        for nw in nodes_written:
-            lr = CONNECTOR_FN(nw, r, vault_root)
-            link_results.append(lr)
+            extracted_ids = [
+                f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d-%H%M')}"
+                f"-{ext.slug}"
+                for ext in scribe_result.extractions
+            ]
+            _publish_progress(r, turn_id, TurnStage.extracted, node_ids=extracted_ids)
+            _set_stage(r, turn_id, TurnStage.extracted.value, node_ids=extracted_ids)
 
-        linked_ids = [lr.id for lr in link_results]
-        _publish_progress(r, turn_id, TurnStage.linked, node_ids=linked_ids)
-        _set_stage(r, turn_id, TurnStage.linked.value, node_ids=linked_ids)
+            # Stage: NoteCreator
+            with _tracer.start_as_current_span(SPAN_STAGE_NOTECREATOR):
+                nodes_written = NOTE_CREATOR_FN(scribe_result, vault_root)
 
-        # ----------------------------------------------------------------
-        # ACK — only here, after the full chain succeeds (AC-4)
-        # ----------------------------------------------------------------
-        r.xack(STREAM_TURNS, GROUP_NAME, msg_id)
-        logger.info("ACKed msg %s for turn %s", msg_id, turn_id)
+            written_ids = [nw.id for nw in nodes_written]
+            _publish_progress(r, turn_id, TurnStage.written, node_ids=written_ids)
+            _set_stage(r, turn_id, TurnStage.written.value, node_ids=written_ids)
 
-        # ----------------------------------------------------------------
-        # Stage: done — set idempotency key + final progress event
-        # ----------------------------------------------------------------
-        _set_stage(r, turn_id, TurnStage.done.value, node_ids=linked_ids)
-        _publish_progress(r, turn_id, TurnStage.done, node_ids=linked_ids)
-        logger.info("Turn %s completed successfully", turn_id)
+            # Stage: Connector
+            with _tracer.start_as_current_span(SPAN_STAGE_CONNECTOR):
+                for nw in nodes_written:
+                    lr = CONNECTOR_FN(nw, r, vault_root)
+                    link_results.append(lr)
 
-    except Exception as exc:
-        # Any failure: publish failed progress, do NOT ACK.
-        # The item stays in PEL and will be reclaimed via XAUTOCLAIM on restart.
-        err_str = str(exc)
-        logger.error("Turn %s failed: %s", turn_id, err_str, exc_info=True)
-        _publish_progress(r, turn_id, TurnStage.failed, error=err_str)
-        # Deliberately do NOT set idempotency stage to 'failed' so a retry can
-        # resume from the last successfully completed stage on redelivery.
+            linked_ids = [lr.id for lr in link_results]
+            _publish_progress(r, turn_id, TurnStage.linked, node_ids=linked_ids)
+            _set_stage(r, turn_id, TurnStage.linked.value, node_ids=linked_ids)
+
+            # ACK only after the full chain succeeds.
+            r.xack(STREAM_TURNS, GROUP_NAME, msg_id)
+            logger.info("ACKed msg %s for turn %s", msg_id, turn_id)
+
+            # Mark done.
+            _set_stage(r, turn_id, TurnStage.done.value, node_ids=linked_ids)
+            _publish_progress(r, turn_id, TurnStage.done, node_ids=linked_ids)
+            logger.info("Turn %s completed successfully", turn_id)
+
+        except Exception as exc:
+            err_str = str(exc)
+            logger.error("Turn %s failed: %s", turn_id, err_str, exc_info=True)
+            _publish_progress(r, turn_id, TurnStage.failed, error=err_str)
+
+        # Eval fires after ACK+done — outside the try block so a bug here
+        # cannot trigger 'failed' progress or prevent ACK.
+        # run_eval catches all its own exceptions; this is belt-and-suspenders.
+        if nodes_written and scribe_result is not None:
+            pass  # Task 4 fills this in
 
 
 # ---------------------------------------------------------------------------

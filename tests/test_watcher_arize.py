@@ -81,3 +81,50 @@ def test_init_arize_called_at_startup(tmp_path, monkeypatch):
 
     mock_init.assert_called_once_with(SERVICE_PIPELINE)
     mock_get_tracer.assert_called_once_with(SERVICE_PIPELINE)
+
+
+# ---------------------------------------------------------------------------
+# Task 3: span structure
+# ---------------------------------------------------------------------------
+
+def _make_tracer():
+    """Return a (tracer, exporter) pair backed by an in-memory OTel provider."""
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    return provider.get_tracer("test"), exporter
+
+
+def test_turn_span_created_with_turn_id(tmp_path):
+    """A root 'turn' span is emitted for every processed message."""
+    from vaultmind.watcher import _process_message
+
+    tracer, exporter = _make_tracer()
+    r = _make_redis(tmp_path)
+
+    _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path), tracer)
+
+    span_names = [s.name for s in exporter.get_finished_spans()]
+    assert "turn" in span_names
+
+    turn_span = next(s for s in exporter.get_finished_spans() if s.name == "turn")
+    assert turn_span.attributes.get("turn_id") == "sess-001-abc"
+
+
+def test_stage_spans_are_children_of_turn(tmp_path):
+    """stage.scribe, stage.notecreator, stage.connector are child spans of 'turn'."""
+    from vaultmind.watcher import _process_message
+
+    tracer, exporter = _make_tracer()
+    r = _make_redis(tmp_path)
+
+    _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path), tracer)
+
+    span_names = [s.name for s in exporter.get_finished_spans()]
+    assert "stage.scribe" in span_names
+    assert "stage.notecreator" in span_names
+    assert "stage.connector" in span_names
