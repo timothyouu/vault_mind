@@ -33,6 +33,16 @@ when a human is faster. The same bucket-approval rules (hard-stop, human review,
 next) apply regardless of executor. A bucket completed directly does not draw from the ACU
 pool.
 
+**Per-stream change ledger — what changed vs. stayed the same:**
+
+| Stream | What changed | What stayed the same |
+|---|---|---|
+| **P1 — Ingestion** | Executor → Devin Cloud session; brief hardened (per-bucket AC, halt-on-ambiguity, stay-in-lane, ACU soft-cap) | Deliverables unchanged in scope; same owned files, same task order |
+| **P2 — Extraction & writing** | Executor → Devin Cloud session; brief hardened; `ANTHROPIC_API_KEY` mocks-first note added | Deliverables unchanged in scope |
+| **P3 — Linking & control plane** | Executor → Devin Cloud session; task order front-loads judged core; human carve-outs (Agentverse registration + Profile URL, ASI:One shared-chat URL, demo video) explicit | Deliverables unchanged in scope; same contracts, same owned files |
+| **P4 — Web app** | Framing updated ("sole human-driven stream"); B↔D cross-executor integration note added | Executor **unchanged** (human Claude Code, no Devin); all deliverables unchanged |
+| **Foundation (Buckets 2–4)** | Executor → dedicated Devin session; per-bucket ACs added | Bucket deliverables unchanged; Bucket 1 done; Bucket 5 Devin-wired, human-witnessed |
+
 ---
 
 ## Devin Session — Foundation (Buckets 2–4)
@@ -40,6 +50,13 @@ pool.
 Executes the shared foundation before any stream begins. Same hard-stop-per-bucket rules as
 P1–P3: complete one bucket, post the diff, wait for human review and merge, then proceed.
 **ACU soft-cap: ~15 ACUs (~19 total allocation); alert the human reviewer at ~15 ACUs.**
+
+**Foundation bucket gating.** Each bucket boundary is approved by a human reviewer against
+**two conditions**: (1) a diff-review confirming the bucket's per-bucket AC (listed below) is
+met, and (2) the **two deterministic checks** — `contracts.py` ↔ `types.ts` field parity and
+every fixture node parsing against AC-1 — both exit 0. These checks must be re-run on every
+foundation bucket diff, not only at Bucket 5. They are the same checks re-applied to each
+P1–P3 Devin diff at that stream's Devin Review boundary (see `SPEC.md` §Execution Model).
 
 - **Bucket 2:** repo + `vaultmind`-package skeleton; `contracts.py` + mirrored `types.ts`; the
   four file templates; fixture transcript + fixture vault every stream mocks against.
@@ -175,9 +192,10 @@ account credentials are ever provisioned to this session.
   ⑤ handoff trigger + handoff scan + entry-point assembly;
   ⑥ Redis vector search (**release valve** — cut depth if behind; heuristic linking already
      ships; never skip steps ①–⑤ to get here);
-  ⑦ **(human carve-out — Devin halts here):** Agentverse registration + ASI:One shared-chat
-     URL + demo video — Devin wires the uAgent code; **humans handle account registration,
-     the shared-chat session URL, and recording**; these are never handed to Devin.
+  ⑦ **(human carve-out — Devin halts here):** Agentverse registration + Agentverse Profile URL
+     + ASI:One shared-chat URL + demo video — Devin wires the uAgent code; **humans handle
+     account registration, the Profile URL, the shared-chat session URL, and recording**;
+     these are never handed to Devin.
 
 **Per-bucket AC (applied at Devin Review):**
 - Bucket passes when: the 3 ASI:One intents return correct responses against the fixture vault
@@ -191,8 +209,9 @@ underspecified contract — never guess); stay-in-lane (owns only `vaultmind/con
 `vaultmind/orchestrator/`, `vaultmind/handoff/`, `vaultmind/memory/` — never edit
 `contracts.py`, `types.ts`, or any other stream's files); ACU-awareness (alert at ~81 ACUs;
 await human approval before drawing from the shared reserve).
-**Human carve-outs (never hand to Devin):** Agentverse registration, ASI:One shared-chat URL,
-demo video — these require account credentials and an interactive session.
+**Human carve-outs (never hand to Devin):** Agentverse registration + Agentverse Profile URL,
+ASI:One shared-chat URL, demo video — these require account credentials and an interactive
+session.
 
 ---
 

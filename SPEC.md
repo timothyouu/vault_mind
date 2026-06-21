@@ -61,7 +61,7 @@ Devin reviewing itself. What each session needs from this spec:
   most-judged deliverable; task order front-loads the uAgent + ASI:One intents, with
   vector-search depth as the release valve if it slips (never the Agentverse publish).**
   Human carve-outs (require account credentials — never hand to Devin): Agentverse
-  registration, ASI:One shared-chat URL, demo video.
+  registration + Agentverse Profile URL, ASI:One shared-chat URL, demo video.
 - **Human Claude Code session — Web app (P4).** Needs the node schema, all four file formats,
   the `NodeChangedEvent` enum, the five display states, and a fixture vault + mock events.
   **Sole human-driven stream — no Devin session. Deliberate: Best UI/UX is a judged prize
@@ -74,6 +74,16 @@ an interface); **stay-in-lane** (touch only your session's owned files, never ed
 `contracts.py` / `types.ts` or another session's files). Per-session file ownership, mock
 strategies, the blocking timeline (as checkpoints, not deadlines), and suggested task order
 live in `WORKSTREAMS.md`.
+
+**Per-stream change ledger — what changed vs. stayed the same:**
+
+| Stream | What changed | What stayed the same |
+|---|---|---|
+| **P1 — Ingestion** | Executor → Devin Cloud session; brief hardened for unattended execution | Stream deliverables unchanged in scope; same owned files, same contracts, same task order |
+| **P2 — Extraction & writing** | Executor → Devin Cloud session; brief hardened; `ANTHROPIC_API_KEY` provisioned (mocks-first); `ANTHROPIC_API_KEY` is the only key — no account credentials | Stream deliverables unchanged in scope |
+| **P3 — Linking & control plane** | Executor → Devin Cloud session; brief hardened; task order front-loads judged core; human carve-outs (Agentverse registration + Profile URL, ASI:One shared-chat URL, demo video) carved out explicitly — Devin never touches these | Stream deliverables unchanged in scope; same contracts, same owned files |
+| **P4 — Web app** | Framing/labels updated (retitled "sole human-driven stream"); integration notes added (B↔D cross-executor test) | Executor **unchanged** (human Claude Code, no Devin); all deliverables unchanged |
+| **Foundation (Buckets 2–4)** | Executor → dedicated Devin session (same hard-stop-per-bucket rules as P1–P3; human review at each boundary) | Bucket deliverables unchanged; Bucket 1 already done; Bucket 5 Devin-wired, human-witnessed |
 
 ---
 
