@@ -23,8 +23,20 @@ $VaultRoot = if ($env:VAULTMIND_VAULT_ROOT) { $env:VAULTMIND_VAULT_ROOT } else {
 New-Item -ItemType Directory -Force -Path (Join-Path $VaultRoot "nodes") | Out-Null
 $env:VAULTMIND_VAULT_ROOT = $VaultRoot
 $PythonExe = "python"
-$watcher = Start-Process $PythonExe -ArgumentList "-m vaultmind.watcher" -PassThru -NoNewWindow
-Write-Host "      Watcher PID: $($watcher.Id)" -ForegroundColor Green
+
+# Check for an already-running watcher on the same vault to avoid duplicate consumers.
+$existingWatcher = Get-WmiObject Win32_Process -Filter "name='python.exe'" |
+    Where-Object { $_.CommandLine -like "*vaultmind.watcher*" } |
+    Select-Object -First 1
+$watcherOwned = $false
+if ($existingWatcher) {
+    Write-Host "      WARNING: watcher already running (PID $($existingWatcher.ProcessId)) for vault '$VaultRoot' — skipping." -ForegroundColor Yellow
+    $watcher = Get-Process -Id $existingWatcher.ProcessId
+} else {
+    $watcher = Start-Process $PythonExe -ArgumentList "-m vaultmind.watcher" -PassThru -NoNewWindow
+    $watcherOwned = $true
+    Write-Host "      Watcher PID: $($watcher.Id)" -ForegroundColor Green
+}
 
 # 3. Next.js dev server
 Write-Host "[3/3] Starting Next.js dev server on port 3000..." -ForegroundColor Yellow
@@ -44,5 +56,8 @@ try {
     Wait-Process -Id $watcher.Id, $nextjs.Id
 } finally {
     Write-Host "Stopping processes..." -ForegroundColor Yellow
-    Stop-Process -Id $watcher.Id, $nextjs.Id -Force -ErrorAction SilentlyContinue
+    if ($watcherOwned) {
+        Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue
+    }
+    Stop-Process -Id $nextjs.Id -Force -ErrorAction SilentlyContinue
 }
