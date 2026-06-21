@@ -63,3 +63,5 @@ def test_reply_queue_overwrites_when_full():
         replies.append(r)
     assert len(replies) == 10
     assert "msg-11" in replies  # newest retained
+    assert "msg-0" not in replies  # oldest evicted
+    assert "msg-1" not in replies  # second-oldest evicted
