@@ -33,6 +33,9 @@ def _acquire_lock() -> None:
             return
         except FileExistsError:
             if time.monotonic() > deadline:
+                # Steal stale lock. Known limitation: if the original holder is still
+                # active but slow (>10 s I/O), both threads briefly share the critical
+                # section. At normal filesystem speeds this is unreachable in practice.
                 lock.unlink(missing_ok=True)
                 continue
             time.sleep(0.05)
