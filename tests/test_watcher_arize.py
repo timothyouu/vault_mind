@@ -36,7 +36,7 @@ def _make_redis(tmp_path: Path) -> fakeredis.FakeRedis:
 
 def _vault(tmp_path: Path) -> Path:
     vault = tmp_path / "vault"
-    vault.mkdir()
+    vault.mkdir(exist_ok=True)
     return vault
 
 
