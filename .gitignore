@@ -23,6 +23,9 @@ vault/
 .env.local
 .env.*.local
 
+# Logs
+*.log
+
 # Editor
 .DS_Store
 .idea/

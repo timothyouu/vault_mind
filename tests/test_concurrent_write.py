@@ -38,7 +38,7 @@ def test_concurrent_intentlog_appends_no_clobber(vault):
         t.join()
 
     assert errors == [], f"Errors: {errors}"
-    content = (vault / "IntentLog.md").read_text()
+    content = (vault / "IntentLog.md").read_text(encoding="utf-8")
     # Exactly one entry should be marked Current
     assert content.count("— Current") == 1
     # All N intents appear
@@ -50,7 +50,7 @@ def test_current_marker_moves_to_newest(vault):
     append_intentlog_entry(vault, "first intent", "claude-code", "developer")
     append_intentlog_entry(vault, "second intent", "claude-code", "developer")
 
-    content = (vault / "IntentLog.md").read_text()
+    content = (vault / "IntentLog.md").read_text(encoding="utf-8")
     lines = content.splitlines()
 
     # The Current marker should be on a heading above the "second intent" line

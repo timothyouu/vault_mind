@@ -108,7 +108,7 @@ def test_intent_shift_appends_to_intentlog(vault):
         encoding="utf-8",
     )
     write_nodes(SCRIBE_RESULT_WITH_INTENT, vault)
-    content = intentlog_path.read_text()
+    content = intentlog_path.read_text(encoding="utf-8")
     assert "Help me finish the auth flow" in content
     assert "ai-detected" in content
     assert content.count("— Current") == 1
