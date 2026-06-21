@@ -27,3 +27,6 @@ vault/
 .DS_Store
 .idea/
 *.swp
+
+# VaultMind cursors (per-session bookmark files)
+.vaultmind/cursors/
