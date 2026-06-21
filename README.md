@@ -74,6 +74,8 @@ The `-e` flag installs the Python package in editable mode, so changes you make 
    VAULTMIND_VAULT_ROOT=/path/to/vault   # defaults to <repo>/vault
    REPO_ROOT=/path/to/repo               # used by webapp conflict resolver
    ```
+   
+> `VAULTMIND_VAULT_ROOT` is useful if you want the vault to live outside the repo — for example, inside an Obsidian vault you already have open. The app will still track it the same way.
 
 3. **Start everything**
 
