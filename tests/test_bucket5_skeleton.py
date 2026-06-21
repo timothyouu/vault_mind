@@ -53,9 +53,12 @@ from vaultmind.contracts import (
 )
 import vaultmind.watcher as watcher_mod
 from vaultmind.watcher import (
-    STREAM_TURNS, STREAM_PROGRESS, STREAM_EVENTS, GROUP_NAME,
+    STREAM_TURNS, CHANNEL_PROGRESS, CHANNEL_EVENTS, GROUP_NAME,
     _ensure_consumer_group, _process_message,
 )
+# Legacy aliases so existing test code that references the old names still works.
+STREAM_PROGRESS = CHANNEL_PROGRESS
+STREAM_EVENTS = CHANNEL_EVENTS
 
 # ---------------------------------------------------------------------------
 # Shared FakeServer client factory
@@ -313,6 +316,33 @@ def test_dod_3_node_written_parses_ac1() -> None:
             body = content[end + 4:].strip()
             assert body, f"{node_file.name}: body is empty"
 
+        # Verify NodeWritten.path is relative (contract: "vault/nodes/<id>.md").
+        # Patch NoteCreator to capture NodeWritten objects.
+        _orig_nc = watcher_mod.NOTE_CREATOR_FN
+        captured_nw: list = []
+        def _capturing_nc(sr, vr):
+            result = _orig_nc(sr, vr)
+            captured_nw.extend(result)
+            return result
+        watcher_mod.NOTE_CREATOR_FN = _capturing_nc
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir2:
+                vault_root2 = pathlib.Path(tmpdir2) / "vault"
+                (vault_root2 / "nodes").mkdir(parents=True)
+                qi2 = _load_fixture_turn(0)
+                _run_one_turn(server, qi2, vault_root2)
+        finally:
+            watcher_mod.NOTE_CREATOR_FN = _orig_nc
+
+        for nw in captured_nw:
+            p = pathlib.Path(nw.path)
+            assert not p.is_absolute(), (
+                f"NodeWritten.path must be relative from repo root, got absolute: {nw.path!r}"
+            )
+            assert nw.path.startswith("vault/nodes/"), (
+                f"NodeWritten.path should start with 'vault/nodes/', got: {nw.path!r}"
+            )
+
         print(f"  DoD 3 PASS: {len(node_files)} node(s) written, all AC-1 compliant")
 
 
@@ -367,9 +397,11 @@ def test_dod_5_connector_publishes_event() -> None:
     assert len(events) >= 1, f"Expected ≥1 node-changed event, got {len(events)}"
     evt = events[0]
     assert {"event", "id", "ts"} <= evt.keys(), f"Event missing required fields: {evt}"
-    valid_types = {"created", "linked", "updated", "deleted",
-                   "secret-detected", "intent-updated", "session-event"}
-    assert evt["event"] in valid_types, f"Unknown event type: {evt['event']!r}"
+    # stub_connector always publishes "linked" — assert the specific type so a
+    # regression (e.g. publishing "created" instead) is caught here.
+    assert evt["event"] == "linked", (
+        f"Expected Connector to publish event type 'linked', got {evt['event']!r}"
+    )
     print(f"  DoD 5 PASS: Connector published event {evt['event']!r} for {evt['id']!r}")
 
 

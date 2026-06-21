@@ -15,7 +15,7 @@ export default function VaultPage() {
 
   useEffect(() => {
     const es = new EventSource("/api/events");
-    setConnected(true);
+    es.onopen = () => setConnected(true);
 
     es.onmessage = (e) => {
       try {
