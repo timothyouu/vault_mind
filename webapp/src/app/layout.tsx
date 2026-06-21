@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import DotBackground from "@/components/DotBackground";
 
-// Space Grotesk is a variable font (wght 300–700). One family for the whole
-// app — display, body, labels, and the old "mono" data slots all use it.
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
@@ -25,7 +24,10 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <DotBackground />
+        {children}
+      </body>
     </html>
   );
 }

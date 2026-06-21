@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { NodeChangedEvent } from "../../types";
 import type { VaultNode } from "./api/nodes/route";
 
@@ -39,21 +41,21 @@ function MergeIcon() {
 // ---------------------------------------------------------------------------
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  decision:   { bg: "rgba(91,140,255,0.12)",  text: "#5b8cff", border: "rgba(91,140,255,0.3)" },
-  constraint: { bg: "rgba(242,109,120,0.1)",    text: "#f26d78", border: "rgba(242,109,120,0.3)" },
-  goal:       { bg: "rgba(70,201,138,0.12)",   text: "#46c98a", border: "rgba(70,201,138,0.3)" },
-  question:   { bg: "rgba(60,198,207,0.12)", text: "#3cc6cf", border: "rgba(60,198,207,0.3)" },
-  scope:      { bg: "rgba(219,165,63,0.15)",  text: "#dba53f", border: "rgba(219,165,63,0.3)" },
+  decision:   { bg: "rgba(56,139,253,0.12)",  text: "#388bfd", border: "rgba(56,139,253,0.3)" },
+  constraint: { bg: "rgba(248,81,73,0.1)",    text: "#f85149", border: "rgba(248,81,73,0.3)" },
+  goal:       { bg: "rgba(63,185,80,0.12)",   text: "#3fb950", border: "rgba(63,185,80,0.3)" },
+  question:   { bg: "rgba(163,113,247,0.12)", text: "#a371f7", border: "rgba(163,113,247,0.3)" },
+  scope:      { bg: "rgba(210,153,34,0.15)",  text: "#d29922", border: "rgba(210,153,34,0.3)" },
 };
 
 const EVENT_COLORS: Record<string, string> = {
-  created:        "#46c98a",
-  linked:         "#5b8cff",
-  updated:        "#dba53f",
-  deleted:        "#f26d78",
-  "secret-detected": "#f26d78",
-  "intent-updated":  "#3cc6cf",
-  "session-event":   "#8a9099",
+  created:        "#3fb950",
+  linked:         "#388bfd",
+  updated:        "#d29922",
+  deleted:        "#f85149",
+  "secret-detected": "#f85149",
+  "intent-updated":  "#a371f7",
+  "session-event":   "#7d8590",
 };
 
 // ---------------------------------------------------------------------------
@@ -87,14 +89,14 @@ function StatusPill({ connected }: { connected: boolean }) {
       display: "inline-flex", alignItems: "center", gap: 5,
       padding: "2px 8px", borderRadius: 9999,
       fontSize: 11, fontFamily: "var(--font-jetbrains-mono, monospace)",
-      background: connected ? "rgba(70,201,138,0.12)" : "rgba(242,109,120,0.1)",
-      color: connected ? "#46c98a" : "#f26d78",
-      border: `1px solid ${connected ? "rgba(70,201,138,0.3)" : "rgba(242,109,120,0.25)"}`,
+      background: connected ? "rgba(63,185,80,0.12)" : "rgba(248,81,73,0.1)",
+      color: connected ? "#3fb950" : "#f85149",
+      border: `1px solid ${connected ? "rgba(63,185,80,0.3)" : "rgba(248,81,73,0.25)"}`,
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: "50%",
-        background: connected ? "#46c98a" : "#f26d78",
-        boxShadow: connected ? "0 0 0 2px rgba(70,201,138,0.3)" : "none",
+        background: connected ? "#3fb950" : "#f85149",
+        boxShadow: connected ? "0 0 0 2px rgba(63,185,80,0.3)" : "none",
       }} />
       {connected ? "live" : "disconnected"}
     </span>
@@ -102,7 +104,7 @@ function StatusPill({ connected }: { connected: boolean }) {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const c = TYPE_COLORS[type] ?? { bg: "rgba(138,144,153,0.12)", text: "#8a9099", border: "rgba(138,144,153,0.25)" };
+  const c = TYPE_COLORS[type] ?? { bg: "rgba(125,133,144,0.12)", text: "#7d8590", border: "rgba(125,133,144,0.25)" };
   return (
     <span style={{
       padding: "1px 7px", borderRadius: 4, fontSize: 10,
@@ -142,8 +144,8 @@ function NodeCard({ node, highlighted }: NodeCardProps) {
             padding: "1px 7px", borderRadius: 4, fontSize: 10,
             fontFamily: "var(--font-jetbrains-mono, monospace)",
             fontWeight: 600, textTransform: "uppercase",
-            background: "rgba(70,201,138,0.1)", color: "#46c98a",
-            border: "1px solid rgba(70,201,138,0.25)",
+            background: "rgba(63,185,80,0.1)", color: "#3fb950",
+            border: "1px solid rgba(63,185,80,0.25)",
           }}>approved</span>
         )}
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>
@@ -194,7 +196,7 @@ export default function VaultPage() {
   // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute("data-vmtheme", theme === "light" ? "light" : "");
-    document.documentElement.style.background = "var(--bg)";
+    document.documentElement.style.background = theme === "light" ? "#ffffff" : "#0d1117";
   }, [theme]);
 
   // Load nodes from disk
@@ -245,57 +247,61 @@ export default function VaultPage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "var(--bg)",
       color: "var(--text)",
-      fontFamily: "var(--font-geist-sans, system-ui, sans-serif)",
+      display: "flex", flexDirection: "column",
     }}>
-      {/* Top bar */}
+      {/* Shared nav — matches graph / intent / merge / setup pages */}
       <header style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "0 24px", height: 52,
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky", top: 0, zIndex: 10,
+        flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+        height: 56, padding: "0 20px",
+        background: "var(--bg)", borderBottom: "1px solid var(--border)", zIndex: 30,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>
-          VaultMind
-        </span>
-        <span style={{
-          fontSize: 11, color: "var(--muted)",
-          fontFamily: "var(--font-jetbrains-mono, monospace)",
-          marginLeft: 2,
-        }}>vault</span>
-
-        <div style={{ flex: 1 }} />
-
-        <StatusPill connected={connected} />
-
-        {([["Setup", "/setup"], ["Graph", "/graph"], ["Intent log", "/intent"], ["Merge", "/merge"]] as const).map(([label, href]) => (
-          <a key={label} href={href} style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            padding: "4px 10px", borderRadius: 6,
-            fontSize: 12, color: "var(--muted)",
-            background: "var(--inset)", border: "1px solid var(--border)",
-            textDecoration: "none", cursor: "pointer",
-          }}>{label}</a>
-        ))}
-
-        <button
-          onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")}
-          style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            width: 30, height: 30, borderRadius: 6,
-            background: "var(--inset)", border: "1px solid var(--border)",
-            color: "var(--muted)", cursor: "pointer",
-          }}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-        </button>
+        {/* Left: logo + nav tabs */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: 7,
+              background: "linear-gradient(135deg, var(--accent), var(--accent-btn))",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)",
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2l8 4.5v9L12 22l-8-6.5v-9L12 2z" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+                <circle cx="12" cy="11" r="2.4" fill="#fff" />
+              </svg>
+            </div>
+            <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.2px" }}>VaultMind</span>
+          </div>
+          <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4 }}>
+            {([["Setup", "/setup"], ["Graph", "/graph"], ["Intent log", "/intent"], ["Merge", "/merge"]] as const).map(([label, href]) => (
+              <Link key={label} href={href} style={{
+                padding: "6px 11px", borderRadius: 7, fontSize: 13, textDecoration: "none",
+                color: "var(--muted)", fontWeight: 400,
+                background: "transparent", border: "1px solid transparent",
+              }}>{label}</Link>
+            ))}
+          </nav>
+        </div>
+        {/* Right: live status + theme toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <StatusPill connected={connected} />
+          <button
+            onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")}
+            title="Toggle theme"
+            style={{
+              width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+              color: "var(--muted)", cursor: "pointer",
+            }}
+          >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
+        </div>
       </header>
 
       {/* Body: left = nodes, right = event feed */}
-      <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
         {/* Left: vault nodes */}
         <main style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
@@ -303,7 +309,7 @@ export default function VaultPage() {
           {/* Stats row */}
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             {Object.entries(counts).map(([type, count]) => {
-              const c = TYPE_COLORS[type] ?? { bg: "rgba(138,144,153,0.1)", text: "var(--muted)", border: "rgba(138,144,153,0.2)" };
+              const c = TYPE_COLORS[type] ?? { bg: "rgba(125,133,144,0.1)", text: "var(--muted)", border: "rgba(125,133,144,0.2)" };
               return (
                 <div key={type} style={{
                   padding: "6px 12px", borderRadius: 6,
