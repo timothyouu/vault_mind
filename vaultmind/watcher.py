@@ -48,6 +48,17 @@ from vaultmind.contracts import (
     TurnStage,
 )
 from vaultmind.secrets import scan_for_secrets
+from opentelemetry import trace as otel_trace
+from vaultmind.arize_init import (
+    init_arize,
+    SERVICE_PIPELINE,
+    ATTR_TURN_ID,
+    SPAN_TURN,
+    SPAN_STAGE_SCRIBE,
+    SPAN_STAGE_NOTECREATOR,
+    SPAN_STAGE_CONNECTOR,
+)
+from vaultmind.evals import run_eval
 
 logger = logging.getLogger(__name__)
 
@@ -393,6 +404,7 @@ def _process_message(
     msg_id: str,
     fields: dict[str, str],
     vault_root: pathlib.Path,
+    tracer=None,
 ) -> None:
     """
     Process one Redis Stream message through the full pipeline chain.
@@ -507,6 +519,7 @@ def _reclaim_pending(
     r: "redis.Redis",  # type: ignore[name-defined]
     consumer: str,
     vault_root: pathlib.Path,
+    tracer=None,
 ) -> None:
     """
     Claim and reprocess any PEL entries idle longer than _RECLAIM_MIN_IDLE_MS.
@@ -536,7 +549,7 @@ def _reclaim_pending(
             logger.info("Reclaimed %d pending message(s)", len(entries))
             for msg_id, fields in entries:
                 logger.info("Reprocessing reclaimed msg %s", msg_id)
-                _process_message(r, msg_id, fields, vault_root)
+                _process_message(r, msg_id, fields, vault_root, tracer)
     except Exception as exc:  # pragma: no cover
         # XAUTOCLAIM may not be available in very old Redis versions; log and continue.
         logger.warning("XAUTOCLAIM failed (skipping PEL reclaim): %s", exc)
@@ -550,18 +563,20 @@ def run_watcher(vault_root: pathlib.Path) -> None:
     """
     Start the watcher loop.
 
-    1. Connect to Redis.
-    2. Ensure the consumer group exists (idempotent).
-    3. Loop:
+    1. Init Arize tracing (no-op if credentials absent).
+    2. Connect to Redis.
+    3. Ensure the consumer group exists (idempotent).
+    4. Loop:
        a. Reclaim any stuck PEL messages.
        b. XREADGROUP for new messages (block 2 s).
        c. Process each message through the full pipeline chain.
     """
+    init_arize(SERVICE_PIPELINE)
+    tracer = otel_trace.get_tracer(SERVICE_PIPELINE)
+
     r = _redis_factory()
     _ensure_consumer_group(r)
 
-    # Consumer name includes PID so multiple watcher processes don't share a
-    # consumer slot; P1 may adjust this convention to watcher-<pid>.
     consumer = f"watcher-{os.getpid()}"
     logger.info(
         "Watcher started — consumer=%s, vault=%s",
@@ -569,25 +584,21 @@ def run_watcher(vault_root: pathlib.Path) -> None:
         vault_root,
     )
 
-    # Reclaim any stuck PEL messages left by a previous crashed process.
-    _reclaim_pending(r, consumer, vault_root)
+    _reclaim_pending(r, consumer, vault_root, tracer)
 
     _reclaim_counter = 0
     while True:
-        # Periodically re-check PEL for items that became idle after startup
-        # (e.g., a peer consumer that crashed while we were running).
         _reclaim_counter += 1
-        if _reclaim_counter % 150 == 0:  # ~every 5 minutes at 2 s/iteration
-            _reclaim_pending(r, consumer, vault_root)
+        if _reclaim_counter % 150 == 0:
+            _reclaim_pending(r, consumer, vault_root, tracer)
 
-        # Read the next message (block up to 2 s for new arrivals).
         try:
             messages = r.xreadgroup(
                 GROUP_NAME,
                 consumer,
                 {STREAM_TURNS: ">"},
                 count=1,
-                block=2000,  # 2 s
+                block=2000,
             )
         except Exception as exc:
             logger.error("XREADGROUP error: %s — sleeping 1 s", exc, exc_info=True)
@@ -595,12 +606,11 @@ def run_watcher(vault_root: pathlib.Path) -> None:
             continue
 
         if not messages:
-            # No new messages within the block window; loop again.
             continue
 
         for _stream_name, entries in messages:
             for msg_id, fields in entries:
-                _process_message(r, msg_id, fields, vault_root)
+                _process_message(r, msg_id, fields, vault_root, tracer)
 
 
 # ---------------------------------------------------------------------------
