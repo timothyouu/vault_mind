@@ -270,18 +270,15 @@ export default function VaultPage() {
 
         <StatusPill connected={connected} />
 
-        <a
-          href="/merge"
-          style={{
+        {([["Setup", "/setup"], ["Graph", "/graph"], ["Intent log", "/intent"], ["Merge", "/merge"]] as const).map(([label, href]) => (
+          <a key={label} href={href} style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             padding: "4px 10px", borderRadius: 6,
             fontSize: 12, color: "var(--muted)",
             background: "var(--inset)", border: "1px solid var(--border)",
             textDecoration: "none", cursor: "pointer",
-          }}
-        >
-          <MergeIcon /> Resolve conflicts
-        </a>
+          }}>{label}</a>
+        ))}
 
         <button
           onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")}
