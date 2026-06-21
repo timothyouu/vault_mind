@@ -387,12 +387,16 @@ def stub_connector(
 
 
 # ---------------------------------------------------------------------------
-# Plug-in points — replace these names when P2 / P3 land
+# Plug-in points — real implementations wired in
 # ---------------------------------------------------------------------------
 
-SCRIBE_FN       = stub_scribe        # P2 replaces
-NOTE_CREATOR_FN = stub_note_creator  # P2 replaces
-CONNECTOR_FN    = stub_connector     # P3 replaces
+from vaultmind.scribe import extract as _real_scribe
+from vaultmind.notecreator import write_nodes as _real_notecreator
+from vaultmind.connector import link_node as _real_connector
+
+SCRIBE_FN       = _real_scribe
+NOTE_CREATOR_FN = _real_notecreator
+CONNECTOR_FN    = _real_connector
 
 
 # ---------------------------------------------------------------------------

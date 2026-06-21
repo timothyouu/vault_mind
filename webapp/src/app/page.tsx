@@ -116,13 +116,13 @@ const EVENT_COLORS: Record<string, string> = {
 
 function fmtTime(iso: string) {
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   } catch { return iso; }
 }
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch { return iso; }
 }
 

@@ -139,7 +139,7 @@ export default function AgentChat() {
 
   function fmtTime(iso: string) {
     try {
-      return new Date(iso).toLocaleTimeString([], {
+      return new Date(iso).toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
       });

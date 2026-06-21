@@ -18,7 +18,7 @@ export interface VaultNode {
 }
 
 function parseNode(content: string): VaultNode | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = content.replace(/\r\n/g, "\n").match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return null;
 
   const frontmatter = match[1];

@@ -94,18 +94,47 @@ interface StepDef {
 
 const STEPS: StepDef[] = [
   {
+    id: "env",
+    title: "Add your API keys",
+    desc: "Create a .env.local file in the repo root with your Anthropic and Arize credentials.",
+    filename: ".env.local",
+    fileKind: "file",
+    code: `ANTHROPIC_API_KEY=sk-ant-...
+ARIZE_SPACE_KEY=your-space-key
+ARIZE_API_KEY=your-api-key`,
+    noteKind: "info",
+    noteKicker: "Note — ",
+    note: "ANTHROPIC_API_KEY is required for extraction. Arize keys are optional but needed to see the eval dashboard.",
+  },
+  {
     id: "claude",
-    title: "Add the Claude Code hook",
-    desc: "Registers Stop + SessionEnd hooks so VaultMind commits and hands off automatically.",
+    title: "Verify the Claude Code hook",
+    desc: "These hooks are already registered in .claude/settings.json — confirm the file matches.",
     filename: ".claude/settings.json",
     fileKind: "file",
     code: `{
   "hooks": {
     "Stop": [
-      { "command": "node .vaultmind/hooks/commit.js" }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .vaultmind/hooks/on_stop.py",
+            "async": true
+          }
+        ]
+      }
     ],
     "SessionEnd": [
-      { "command": "node .vaultmind/hooks/handoff.js" }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .vaultmind/hooks/on_session_end.py",
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }`,
@@ -113,44 +142,43 @@ const STEPS: StepDef[] = [
   {
     id: "codex",
     title: "Add the Codex hook",
-    desc: "Codex fires Stop only — VaultMind still commits on every turn.",
+    desc: "If you use Codex, add this to .codex/hooks.json. Codex fires Stop only — no SessionEnd.",
     filename: ".codex/hooks.json",
     fileKind: "file",
     tag: "Stop only",
     tagKind: "amber",
     code: `{
-  "Stop": [
-    { "command": "node .vaultmind/hooks/commit.js" }
-  ]
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .vaultmind/hooks/on_stop.py"
+          }
+        ]
+      }
+    ]
+  }
 }`,
     noteKind: "amber",
     noteKicker: "Heads up — ",
-    note: "Codex has no SessionEnd equivalent; async hooks aren't supported, so handoff runs on next app open instead.",
-  },
-  {
-    id: "deps",
-    title: "Install dependencies",
-    desc: "Clone the CLI into your repo and pull Node + Python deps.",
-    filename: "terminal",
-    fileKind: "term",
-    code: `git clone https://github.com/<org>/vaultmind-cli.git .vaultmind
-cd .vaultmind && npm install \\
-  && pip install -r requirements.txt --break-system-packages`,
+    note: "Codex has no SessionEnd equivalent and doesn't support async hooks, so idle-timeout detection is used instead.",
   },
   {
     id: "start",
     title: "Start background services",
-    desc: "Spins up both the file watcher and the web app in one process.",
+    desc: "Starts Redis (Docker), the Python watcher, and the web app in one command.",
     filename: "terminal",
     fileKind: "term",
     code: "npm run vaultmind:start",
     noteKind: "info",
-    note: "Runs the watcher and the web server together — leave it running in a spare tab.",
+    note: "Requires Docker Desktop running. Leave this terminal tab open while you work.",
   },
   {
     id: "open",
     title: "Open the web app",
-    desc: "The graph and trust interface render immediately, even with zero nodes.",
+    desc: "Nodes appear live as you work. The graph and event feed update without refresh.",
     link: "http://localhost:3000",
   },
 ];
@@ -406,7 +434,7 @@ export default function SetupPage() {
             Drop in a hook, start the watcher, open the graph. Copy-paste each block in order and you'll be capturing intent in under a minute.
           </p>
 
-          {/* One-line installer */}
+          {/* Quick-start callout */}
           <div style={{
             background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface))",
             border: "1px solid color-mix(in srgb, var(--accent) 35%, var(--border))",
@@ -416,8 +444,8 @@ export default function SetupPage() {
             <div style={{ flex: 1, minWidth: 240 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <BoltIcon />
-                <span style={{ fontWeight: 600, fontSize: 13.5 }}>One-line install</span>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>— skip the steps below</span>
+                <span style={{ fontWeight: 600, fontSize: 13.5 }}>Quick start</span>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>— after adding .env.local</span>
               </div>
               <div style={{
                 display: "flex", alignItems: "center", gap: 10,
@@ -426,11 +454,11 @@ export default function SetupPage() {
                 color: "var(--text)", overflowX: "auto",
               }}>
                 <span style={{ color: "var(--green)", userSelect: "none" }}>$</span>
-                <span style={{ whiteSpace: "nowrap" }}>curl -sSL https://vaultmind.dev/install.sh | bash</span>
+                <span style={{ whiteSpace: "nowrap" }}>npm run vaultmind:start</span>
               </div>
             </div>
             <button
-              onClick={() => copy("curl -sSL https://vaultmind.dev/install.sh | bash", "installer")}
+              onClick={() => copy("npm run vaultmind:start", "installer")}
               style={{
                 flexShrink: 0, display: "flex", alignItems: "center", gap: 7, padding: "9px 16px",
                 background: "var(--accent-btn)", border: "1px solid color-mix(in srgb, #fff 14%, var(--accent-btn))",
@@ -444,7 +472,7 @@ export default function SetupPage() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "0 2px 24px" }}>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-            <span style={{ fontSize: 11.5, color: "var(--faint)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>or step through it</span>
+            <span style={{ fontSize: 11.5, color: "var(--faint)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>step-by-step</span>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
           </div>
 

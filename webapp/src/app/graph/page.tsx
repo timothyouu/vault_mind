@@ -737,7 +737,10 @@ export default function GraphPage() {
   const [overrides, setOverrides] = useState<Record<string, { status?: string; content?: string }>>({});
   const [toast, setToast] = useState<{ msg: string; kind: "ok" | "bad" | "info" } | null>(null);
   const [liveCount, setLiveCount] = useState(4);
+  const [mounted, setMounted] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     try {
@@ -982,12 +985,12 @@ export default function GraphPage() {
             </Link>
           </div>
 
-          {/* SVG graph */}
+          {/* SVG graph — client-only to avoid float-precision hydration mismatch */}
           <svg
             viewBox="0 0 1000 760"
             preserveAspectRatio="xMidYMid meet"
             style={{ width: "100%", height: "100%", display: "block" }}
-          >
+          >{!mounted ? null : (<>
             <g>
               {G.edges.filter(e => {
                 const a = G.byId[e.a], b = G.byId[e.b];
@@ -1045,6 +1048,7 @@ export default function GraphPage() {
                 );
               })}
             </g>
+          </>)}
           </svg>
 
           {/* Hover tooltip */}
