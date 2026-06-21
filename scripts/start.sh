@@ -31,7 +31,9 @@ echo "      Watcher PID: $WATCHER_PID"
 # 3. Next.js dev server
 echo "[3/3] Starting Next.js dev server on port 3000..."
 cd "$REPO_ROOT/webapp"
-npm run dev &
+# Propagate REPO_ROOT so conflicts.ts resolves vault/nodes/ and the Python
+# scanner subprocess use the correct repo root, not a guessed path from cwd.
+REPO_ROOT="$REPO_ROOT" npm run dev &
 NEXTJS_PID=$!
 echo "      Next.js PID: $NEXTJS_PID"
 

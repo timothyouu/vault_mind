@@ -4,7 +4,13 @@ import * as path from "path";
 
 // Assumes Next.js dev server is started from webapp/ — override via REPO_ROOT env var
 const REPO_ROOT = process.env.REPO_ROOT ?? path.resolve(process.cwd(), "..");
-const VAULT_NODES = path.join(REPO_ROOT, "vault", "nodes");
+// VAULT_NODES: prefer the real vault, fall back to fixtures when vault/nodes/ doesn't
+// exist yet (e.g. running `npm run dev` standalone without the full stack started).
+const _defaultVaultNodes = path.join(REPO_ROOT, "vault", "nodes");
+const _fixtureVaultNodes = path.join(REPO_ROOT, "fixtures", "vault", "nodes");
+const VAULT_NODES =
+  process.env.VAULT_NODES ??
+  (fs.existsSync(_defaultVaultNodes) ? _defaultVaultNodes : _fixtureVaultNodes);
 
 export interface HunkLine {
   no: number;
@@ -84,15 +90,24 @@ export interface SecretHit {
 }
 
 export function scanFile(absPath: string): SecretHit[] {
+  // Do NOT silently return [] on Python failure — that would bypass the secret
+  // scan entirely and allow writes that should be blocked. Throw instead so
+  // resolveNode can surface the scan failure distinctly from "no secrets found".
+  let out: string;
   try {
-    const out = execFileSync("python3", ["-m", "vaultmind.secrets", absPath], {
+    out = execFileSync("python3", ["-m", "vaultmind.secrets", absPath], {
       cwd: REPO_ROOT,
       encoding: "utf-8",
       timeout: 8000,
     });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Secret scan failed (python3 -m vaultmind.secrets): ${msg}`);
+  }
+  try {
     return JSON.parse(out) as SecretHit[];
   } catch {
-    return [];
+    throw new Error(`Secret scanner returned non-JSON output: ${out.slice(0, 200)}`);
   }
 }
 
@@ -249,6 +264,8 @@ export function resolveNode(
     fs.writeFileSync(tmpPath, merged, "utf-8");
     const hits = scanFile(tmpPath);
     if (hits.length > 0) {
+      // Clean up temp file before returning — don't leave .vmtmp on disk.
+      try { fs.unlinkSync(tmpPath); } catch {}
       return {
         ok: false,
         secretBlocked: hits[0].description,
@@ -258,8 +275,11 @@ export function resolveNode(
     // Atomic rename
     fs.renameSync(tmpPath, absPath);
     return { ok: true };
-  } catch {
+  } catch (err: unknown) {
     try { fs.unlinkSync(tmpPath); } catch {}
-    return { ok: false };
+    // Surface scan configuration failures (e.g. python3 not found) distinctly
+    // from generic I/O errors so the caller can show a meaningful message.
+    const msg = err instanceof Error ? err.message : "unknown error";
+    return { ok: false, secretBlocked: msg };
   }
 }

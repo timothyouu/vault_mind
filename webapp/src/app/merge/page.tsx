@@ -103,7 +103,8 @@ function GraphIcon() {
 }
 
 // ---------------------------------------------------------------------------
-// Types mirroring the server shapes (no import from lib — server-only)
+// Types derived from server shapes — `import type` above is erased at build time,
+// safe to use in client components.
 // ---------------------------------------------------------------------------
 
 type HunkLine = { no: number; text: string };
@@ -139,6 +140,7 @@ interface ScanState {
 export default function MergePage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [summaries, setSummaries] = useState<Summary[] | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [resolutions, setResolutions] = useState<Resolutions>({});
@@ -177,8 +179,10 @@ export default function MergePage() {
   // Load conflict list
   const loadSummaries = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch("/api/conflicts");
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json() as { files: Summary[] };
       setSummaries(data.files);
       if (data.files.length > 0 && !activeId) {
@@ -187,7 +191,9 @@ export default function MergePage() {
         setActiveId(null);
         setFileData(null);
       }
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not reach server";
+      setFetchError(`Could not load conflicts — ${msg}`);
       setSummaries([]);
     } finally {
       setLoading(false);
@@ -203,9 +209,15 @@ export default function MergePage() {
     setResolutions({});
     setScan(null);
     fetch(`/api/conflicts/${encodeURIComponent(activeId)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d: FileData) => setFileData(d))
-      .catch(() => {});
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "unknown error";
+        showToast(`Could not load node "${activeId}": ${msg}`, "bad");
+      });
   }, [activeId]);
 
   const hunks = fileData
@@ -225,6 +237,8 @@ export default function MergePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resolutions }),
       });
+      // 200 (ok) and 422 (blocked) both return JSON; anything else is a server error
+      if (!res.ok && res.status !== 422) throw new Error(`Server error ${res.status}`);
       const data = await res.json() as { ok: boolean; secretBlocked?: string; scanSnippet?: string };
       if (data.ok) {
         showToast("merged → committed 1 node to disk", "ok");
@@ -551,8 +565,15 @@ export default function MergePage() {
         </>
       )}
 
+      {/* FETCH ERROR */}
+      {!loading && fetchError && (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--red)", fontSize: 13, padding: "40px 24px", textAlign: "center" }}>
+          {fetchError}
+        </div>
+      )}
+
       {/* NO CONFLICTS */}
-      {!loading && noConflicts && (
+      {!loading && !fetchError && noConflicts && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", textAlign: "center" }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--green-dim)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, flex: "none" }}>
             <CheckIcon size={26} color="var(--green)" />

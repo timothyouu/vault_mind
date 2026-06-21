@@ -55,10 +55,10 @@ logger = logging.getLogger(__name__)
 # Stream / group constants
 # ---------------------------------------------------------------------------
 
-STREAM_TURNS    = "vaultmind:turns"
-STREAM_PROGRESS = "vaultmind:progress"
-STREAM_EVENTS   = "vaultmind:events"
-GROUP_NAME      = "vaultmind-workers"
+STREAM_TURNS     = "vaultmind:turns"      # Redis Stream (XADD / XREADGROUP)
+CHANNEL_PROGRESS = "vaultmind:progress"   # Redis pub/sub channel
+CHANNEL_EVENTS   = "vaultmind:events"     # Redis pub/sub channel
+GROUP_NAME       = "vaultmind-workers"
 
 # Minimum idle time (ms) before a PEL entry is auto-claimed on restart.
 _RECLAIM_MIN_IDLE_MS = 5 * 60 * 1000  # 5 minutes
@@ -128,7 +128,7 @@ def _publish_progress(
         "ts": ts,
         "error": error,
     }
-    r.publish(STREAM_PROGRESS, json.dumps(payload))
+    r.publish(CHANNEL_PROGRESS, json.dumps(payload))
 
 
 # ---------------------------------------------------------------------------
@@ -290,10 +290,13 @@ def stub_note_creator(
         node_path.write_text(content, encoding="utf-8")
         logger.info("NoteCreator wrote node: %s", node_path)
 
+        # NodeWritten.path must be relative from repo root per the contract doc.
+        # vault_root.parent == repo root (vault_root is e.g. /repo/vault/).
+        relative_path = node_path.relative_to(vault_root.parent)
         written.append(
             NodeWritten(
                 id=node_id,
-                path=str(node_path),
+                path=str(relative_path),
                 type=extraction.type,
                 title=extraction.title,
                 status=NodeStatus.approved,
@@ -327,7 +330,10 @@ def stub_connector(
 
     P3 replaces this with the real Connector (vector search + heuristic linking).
     """
-    node_path = pathlib.Path(nw.path)
+    # Resolve path: NodeWritten.path is relative from repo root per the contract;
+    # vault_root.parent == repo root.  Accept absolute paths too for safety.
+    _p = pathlib.Path(nw.path)
+    node_path = _p if _p.is_absolute() else vault_root.parent / _p
     content = node_path.read_text(encoding="utf-8")
 
     # Simple string replacement on the YAML line — stub only.
@@ -354,7 +360,7 @@ def stub_connector(
         id=nw.id,
         ts=ts,
     )
-    r.publish(STREAM_EVENTS, json.dumps({
+    r.publish(CHANNEL_EVENTS, json.dumps({
         "event": event.event.value,
         "id": event.id,
         "ts": event.ts,
@@ -563,9 +569,16 @@ def run_watcher(vault_root: pathlib.Path) -> None:
         vault_root,
     )
 
+    # Reclaim any stuck PEL messages left by a previous crashed process.
+    _reclaim_pending(r, consumer, vault_root)
+
+    _reclaim_counter = 0
     while True:
-        # Try to reclaim stuck messages from PEL first (crash-recovery).
-        _reclaim_pending(r, consumer, vault_root)
+        # Periodically re-check PEL for items that became idle after startup
+        # (e.g., a peer consumer that crashed while we were running).
+        _reclaim_counter += 1
+        if _reclaim_counter % 150 == 0:  # ~every 5 minutes at 2 s/iteration
+            _reclaim_pending(r, consumer, vault_root)
 
         # Read the next message (block up to 2 s for new arrivals).
         try:
