@@ -85,7 +85,7 @@ function VaultNav({ theme, onToggle, liveCount }: {
 }
 
 // ---------------------------------------------------------------------------
-// Graph data
+// Graph data types
 // ---------------------------------------------------------------------------
 
 interface GNode {
@@ -93,13 +93,403 @@ interface GNode {
   status: "clean" | "pending" | "blocked";
   cx: number; cy: number; r: number;
   isCenter?: boolean; isHub?: boolean; orphan?: boolean;
-  type: string; created: string; intentRef: string; deg: number;
+  // AC-1 node schema fields
+  nodeId: string;
+  nodeType: "decision" | "constraint" | "goal" | "question" | "scope";
+  title: string;
+  created: string;
+  sourceTool: "claude-code" | "codex";
+  sourceSession: string;
+  intentRef: string;
+  reviewStatus: "approved" | "pending";
+  related: string[];
+  flags: string[];
+  deg: number;
   content?: string;
 }
 
 interface GEdge { a: string; b: string; spoke?: boolean; cross?: boolean; faint?: boolean; }
 
 interface GGroup { id: string; label: string; color: string; desc: string; }
+
+// ---------------------------------------------------------------------------
+// Node metadata (AC-1 schema for every demo node)
+// ---------------------------------------------------------------------------
+
+type NodeMeta = {
+  nodeType: "decision" | "constraint" | "goal" | "question" | "scope";
+  title: string;
+  nodeId: string;
+  sourceTool: "claude-code" | "codex";
+  sourceSession: string;
+  intentRef: string;
+  reviewStatus: "approved" | "pending";
+  related: string[];
+  flags: string[];
+};
+
+const NODE_META: Record<string, NodeMeta> = {
+  // PIPELINE
+  "pipeline:turn-ingestion": {
+    nodeType: "decision", title: "Use Redis Streams (vaultmind:turns) for the turn queue",
+    nodeId: "2026-06-18-1015-turn-ingestion",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[redis-streams]]", "[[queue-item]]", "[[Constraints]]"], flags: [],
+  },
+  "pipeline:claude-hook": {
+    nodeType: "decision", title: "PostToolUse hook writes QueueItem to vaultmind:turns",
+    nodeId: "2026-06-18-1020-claude-hook",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[turn-ingestion]]", "[[queue-item]]", "[[queue-producer]]"], flags: [],
+  },
+  "pipeline:codex-hook": {
+    nodeType: "decision", title: "Codex post-exec hook mirrors QueueItem contract; transcript_path may be null",
+    nodeId: "2026-06-18-1025-codex-hook",
+    sourceTool: "codex", sourceSession: "14b72cd1-8ae3",
+    intentRef: "2026-06-18 14:30", reviewStatus: "approved",
+    related: ["[[turn-ingestion]]", "[[queue-item]]", "[[transcript-reader]]"], flags: [],
+  },
+  "pipeline:session-start": {
+    nodeType: "decision", title: "SessionStart hook seeds SessionState.md and the current intent slot",
+    nodeId: "2026-06-18-1030-session-start",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[session-state]]", "[[intent-log]]", "[[sessionstate-writer]]"], flags: [],
+  },
+  "pipeline:session-end": {
+    nodeType: "decision", title: "SessionEnd hook triggers vault commit + Orchestrator handoff",
+    nodeId: "2026-06-18-1035-session-end",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[session-state]]", "[[orchestrator]]", "[[handoff-gate]]"], flags: [],
+  },
+  "pipeline:transcript-reader": {
+    nodeType: "decision", title: "P1 reads transcript_path from QueueItem; null-safe for Codex turns",
+    nodeId: "2026-06-18-1040-transcript-reader",
+    sourceTool: "codex", sourceSession: "14b72cd1-8ae3",
+    intentRef: "2026-06-18 14:30", reviewStatus: "approved",
+    related: ["[[turn-ingestion]]", "[[queue-item]]", "[[codex-hook]]"], flags: [],
+  },
+  "pipeline:queue-producer": {
+    nodeType: "decision", title: "XADD to vaultmind:turns; consumer group created once by watcher at startup",
+    nodeId: "2026-06-18-1045-queue-producer",
+    sourceTool: "codex", sourceSession: "14b72cd1-8ae3",
+    intentRef: "2026-06-18 14:30", reviewStatus: "approved",
+    related: ["[[redis-streams]]", "[[consumer-group]]", "[[turn-ingestion]]"], flags: [],
+  },
+  "pipeline:sessionstate-writer": {
+    nodeType: "constraint", title: "SessionState.md appends use atomic write-temp-rename + .lock sentinel",
+    nodeId: "2026-06-18-1050-sessionstate-writer",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[session-state]]", "[[intent-log]]", "[[Constraints]]"], flags: [],
+  },
+  "pipeline:compaction-detect": {
+    nodeType: "decision", title: "compact_boundary subtype in transcript sets [post-compaction] flag on subsequent nodes",
+    nodeId: "2026-06-18-1055-compaction-detect",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[session-state]]", "[[node-store]]", "[[sessionstate-writer]]"], flags: [],
+  },
+  "pipeline:intent-shift": {
+    nodeType: "question", title: "When exactly does a topic change warrant a new IntentLog entry vs amending the current one?",
+    nodeId: "2026-06-20-1145-intent-shift",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "pending",
+    related: ["[[intent-log]]", "[[scribe]]"], flags: [],
+  },
+  // AGENTS
+  "agents:orchestrator": {
+    nodeType: "goal", title: "Orchestrator uAgent is point-of-record + in-flight tracker for every turn",
+    nodeId: "2026-06-18-0900-orchestrator",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[fetch-ai-uagent]]", "[[turn-progress]]", "[[link-result]]", "[[arize-telemetry]]"], flags: [],
+  },
+  "agents:scribe": {
+    nodeType: "goal", title: "Scribe extracts decisions, constraints, goals from each turn via Claude API",
+    nodeId: "2026-06-18-0910-scribe",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[note-creator]]", "[[scribe-result]]", "[[queue-item]]"], flags: [],
+  },
+  "agents:note-creator": {
+    nodeType: "goal", title: "Note Creator wraps Scribe output verbatim; body is byte-for-byte immutable after write",
+    nodeId: "2026-06-19-0900-note-creator",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "pending",
+    related: ["[[scribe]]", "[[node-store]]", "[[write-time-scan]]", "[[Constraints]]"], flags: [],
+  },
+  "agents:connector": {
+    nodeType: "constraint", title: "Connector writes ONLY frontmatter related field; never touches node body",
+    nodeId: "2026-06-18-0920-connector",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[node-store]]", "[[link-result]]", "[[node-written]]", "[[Constraints]]"], flags: [],
+  },
+  "agents:fetch-ai-uagent": {
+    nodeType: "goal", title: "Orchestrator published as uAgent on Agentverse; ASI:One exposes three intents",
+    nodeId: "2026-06-19-0915-fetch-ai-uagent",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "pending",
+    related: ["[[orchestrator]]", "[[asi-one-intents]]", "[[agentverse]]"], flags: [],
+  },
+  "agents:arize-telemetry": {
+    nodeType: "constraint", title: "All agents emit OpenTelemetry traces to Arize Phoenix for observability",
+    nodeId: "2026-06-18-0930-arize-telemetry",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[orchestrator]]", "[[Constraints]]"], flags: ["secret-detected"],
+  },
+  "agents:agentverse": {
+    nodeType: "decision", title: "Agentverse registration and Profile URL are human-owned carve-outs; Devin never touches them",
+    nodeId: "2026-06-20-1150-agentverse",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "approved",
+    related: ["[[fetch-ai-uagent]]", "[[orchestrator]]"], flags: [],
+  },
+  "agents:asi-one-intents": {
+    nodeType: "scope", title: "Three ASI:One intents: capture (turn arrives), summarise (session end), handoff (SessionEnd)",
+    nodeId: "2026-06-20-1155-asi-one-intents",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "pending",
+    related: ["[[orchestrator]]", "[[fetch-ai-uagent]]", "[[session-end]]"], flags: [],
+  },
+  // STORAGE
+  "storage:redis-streams": {
+    nodeType: "constraint", title: "Redis is the only cross-language seam; disk is source of truth, Redis delivers events",
+    nodeId: "2026-06-18-0830-redis-streams",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[turn-ingestion]]", "[[redis-pubsub]]", "[[node-store]]", "[[Constraints]]"], flags: [],
+  },
+  "storage:vault-layout": {
+    nodeType: "scope", title: "Vault: nodes/, ProjectGoal.md, Constraints.md, TechStack.md, IntentLog.md, VaultIndex.md, SessionState.md",
+    nodeId: "2026-06-18-0835-vault-layout",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[node-store]]", "[[intent-log]]", "[[session-state]]", "[[vault-index]]"], flags: [],
+  },
+  "storage:node-store": {
+    nodeType: "constraint", title: "Disk is source of truth; Redis events are minimal 're-read this id' triggers, never payloads",
+    nodeId: "2026-06-18-0840-node-store",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[vault-layout]]", "[[redis-pubsub]]", "[[Constraints]]"], flags: [],
+  },
+  "storage:intent-log": {
+    nodeType: "scope", title: "IntentLog.md is append-only, newest-on-top; exactly one entry marked Current",
+    nodeId: "2026-06-18-0845-intent-log",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[vault-layout]]", "[[sessionstate-writer]]", "[[Constraints]]"], flags: [],
+  },
+  "storage:session-state": {
+    nodeType: "scope", title: "SessionState.md records session-event rows and compaction flags deterministically",
+    nodeId: "2026-06-18-0850-session-state",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[vault-layout]]", "[[compaction-detect]]", "[[sessionstate-writer]]"], flags: ["secret-detected"],
+  },
+  "storage:vault-index": {
+    nodeType: "scope", title: "VaultIndex.md is the static entry point for LLM context loading order",
+    nodeId: "2026-06-18-0855-vault-index",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[vault-layout]]", "[[node-store]]"], flags: [],
+  },
+  "storage:redis-pubsub": {
+    nodeType: "constraint", title: "vaultmind:events pub/sub channel delivers NodeChangedEvent to the web app via SSE",
+    nodeId: "2026-06-18-0900-redis-pubsub",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[redis-streams]]", "[[node-changed-event]]", "[[sse-endpoint]]"], flags: [],
+  },
+  "storage:vector-memory": {
+    nodeType: "decision", title: "Redis vector memory stores embeddings for semantic node search across the vault",
+    nodeId: "2026-06-19-0905-vector-memory",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "pending",
+    related: ["[[redis-streams]]", "[[connector]]"], flags: [],
+  },
+  "storage:consumer-group": {
+    nodeType: "constraint", title: "Consumer group vaultmind-workers created once by the watcher at startup; P1 producer must never create it",
+    nodeId: "2026-06-18-0905-consumer-group",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[redis-streams]]", "[[queue-producer]]"], flags: [],
+  },
+  "storage:constraints": {
+    nodeType: "scope", title: "Standing constraints anchor: no second scanForSecrets, no silent commit, disk is truth",
+    nodeId: "2026-06-18-0910-constraints",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[scan-secrets]]", "[[handoff-gate]]", "[[node-store]]"], flags: [],
+  },
+  // CONTRACTS
+  "contracts:types-ts": {
+    nodeType: "scope", title: "types.ts is frozen; every field must match contracts.py exactly at each Devin Review boundary",
+    nodeId: "2026-06-18-0845-types-ts",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[contracts-py]]", "[[queue-item]]", "[[TechStack]]"], flags: [],
+  },
+  "contracts:contracts-py": {
+    nodeType: "scope", title: "contracts.py is frozen; Devin sessions must never edit it",
+    nodeId: "2026-06-18-0846-contracts-py",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[queue-item]]"], flags: [],
+  },
+  "contracts:queue-item": {
+    nodeType: "scope", title: "QueueItem: turn_id, source_tool, session_id, transcript_path, turn_text, enqueued_at",
+    nodeId: "2026-06-18-0847-queue-item",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[turn-ingestion]]", "[[queue-producer]]", "[[transcript-reader]]"], flags: [],
+  },
+  "contracts:scribe-result": {
+    nodeType: "scope", title: "ScribeResult: turn_id, extractions[{type, title, slug, body}], intent_shift",
+    nodeId: "2026-06-18-0848-scribe-result",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[scribe]]", "[[note-creator]]"], flags: [],
+  },
+  "contracts:node-written": {
+    nodeType: "scope", title: "NodeWritten: id, path, type, title, status, flags, intent_ref — Connector reads this",
+    nodeId: "2026-06-18-0849-node-written",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[note-creator]]", "[[connector]]"], flags: [],
+  },
+  "contracts:link-result": {
+    nodeType: "scope", title: "LinkResult: id, related[], status, linked_at — Connector → Orchestrator",
+    nodeId: "2026-06-18-0850-link-result",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[connector]]", "[[orchestrator]]"], flags: [],
+  },
+  "contracts:turn-progress": {
+    nodeType: "scope", title: "TurnProgress: turn_id, stage, node_ids[] — enables idempotent resume on redelivery",
+    nodeId: "2026-06-18-0851-turn-progress",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[orchestrator]]"], flags: [],
+  },
+  "contracts:node-changed-event": {
+    nodeType: "scope", title: "NodeChangedEvent enum: created|linked|updated|deleted|secret-detected|intent-updated|session-event",
+    nodeId: "2026-06-18-0852-node-changed-event",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[types-ts]]", "[[redis-pubsub]]", "[[sse-endpoint]]"], flags: [],
+  },
+  // WEBAPP
+  "webapp:graph-canvas": {
+    nodeType: "decision", title: "Force-layout trust graph as the primary vault view; five display states from AC-7",
+    nodeId: "2026-06-19-1100-graph-canvas",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "approved",
+    related: ["[[node-panel]]", "[[sse-endpoint]]", "[[node-changed-event]]"], flags: [],
+  },
+  "webapp:merge-page": {
+    nodeType: "decision", title: "GitHub-dark conflict resolution UI with per-hunk accept/reject and secret-scan gate",
+    nodeId: "2026-06-20-1145-merge-page",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "pending",
+    related: ["[[conflict-resolver]]", "[[scan-secrets]]", "[[graph-canvas]]"], flags: [],
+  },
+  "webapp:intent-page": {
+    nodeType: "decision", title: "Intent log view: append-only timeline, newest-on-top, mirrors IntentLog.md",
+    nodeId: "2026-06-20-1150-intent-page",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "pending",
+    related: ["[[intent-log]]", "[[graph-canvas]]"], flags: [],
+  },
+  "webapp:sse-endpoint": {
+    nodeType: "decision", title: "/api/events SSE route subscribes to vaultmind:events Redis pub/sub",
+    nodeId: "2026-06-19-1105-sse-endpoint",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "pending",
+    related: ["[[redis-pubsub]]", "[[node-changed-event]]", "[[graph-canvas]]"], flags: [],
+  },
+  "webapp:node-panel": {
+    nodeType: "decision", title: "Right-hand panel renders AC-1 frontmatter + staging editor with scanForSecrets on save",
+    nodeId: "2026-06-19-1110-node-panel",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "pending",
+    related: ["[[graph-canvas]]", "[[scan-secrets]]", "[[types-ts]]"], flags: [],
+  },
+  "webapp:conflict-resolver": {
+    nodeType: "decision", title: "Merge page resolves git conflict markers via server-side parser in conflicts.ts",
+    nodeId: "2026-06-20-1155-conflict-resolver",
+    sourceTool: "claude-code", sourceSession: "3e8b5522-aa17",
+    intentRef: "2026-06-20 11:45", reviewStatus: "approved",
+    related: ["[[merge-page]]", "[[scan-secrets]]"], flags: [],
+  },
+  "webapp:setup-page": {
+    nodeType: "decision", title: "Setup page guides PostToolUse hook installation for claude-code and codex",
+    nodeId: "2026-06-19-1115-setup-page",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "approved",
+    related: ["[[claude-hook]]", "[[codex-hook]]"], flags: [],
+  },
+  "webapp:agent-chat": {
+    nodeType: "decision", title: "AgentChat widget sends prompts to /api/agent which forwards to the Orchestrator uAgent",
+    nodeId: "2026-06-21-1432-agent-chat",
+    sourceTool: "claude-code", sourceSession: "4c7d2831-bb92",
+    intentRef: "2026-06-21 14:32", reviewStatus: "approved",
+    related: ["[[orchestrator]]", "[[fetch-ai-uagent]]", "[[graph-canvas]]"], flags: [],
+  },
+  // SECURITY
+  "security:scan-secrets": {
+    nodeType: "constraint", title: "One scanForSecrets implementation in Python; never add a second",
+    nodeId: "2026-06-18-0900-scan-secrets",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[pre-commit-hook]]", "[[handoff-gate]]", "[[write-time-scan]]", "[[Constraints]]"], flags: [],
+  },
+  "security:pre-commit-hook": {
+    nodeType: "constraint", title: "Pre-commit hook runs scanForSecrets; detected secret blocks the commit",
+    nodeId: "2026-06-18-0905-pre-commit-hook",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[scan-secrets]]", "[[handoff-gate]]"], flags: [],
+  },
+  "security:handoff-gate": {
+    nodeType: "constraint", title: "Detected secret blocks handoff in both Auto and Review modes; no silent bypass",
+    nodeId: "2026-06-18-0910-handoff-gate",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[scan-secrets]]", "[[pre-commit-hook]]", "[[Constraints]]"], flags: [],
+  },
+  "security:secret-patterns": {
+    nodeType: "constraint", title: "Patterns: AWS keys, Stripe live keys, PEM private key blocks, hardcoded credentials",
+    nodeId: "2026-06-18-0915-secret-patterns",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[scan-secrets]]"], flags: [],
+  },
+  "security:write-time-scan": {
+    nodeType: "constraint", title: "Note Creator runs scanForSecrets on the node body before any disk write",
+    nodeId: "2026-06-18-0920-write-time-scan",
+    sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+    intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+    related: ["[[scan-secrets]]", "[[note-creator]]", "[[pre-commit-hook]]"], flags: [],
+  },
+  "security:blocked-display": {
+    nodeType: "decision", title: "Blocked nodes render red ring + scanForSecrets banner; status set to secret-detected",
+    nodeId: "2026-06-19-1120-blocked-display",
+    sourceTool: "claude-code", sourceSession: "2f4a9011-cc41",
+    intentRef: "2026-06-19 09:00", reviewStatus: "approved",
+    related: ["[[scan-secrets]]", "[[graph-canvas]]", "[[node-panel]]"], flags: [],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Graph builder
+// ---------------------------------------------------------------------------
 
 function rng(seed: number) {
   let s = seed | 0;
@@ -112,26 +502,31 @@ function rng(seed: number) {
 }
 
 function buildGraph() {
-  const rand = rng(20260620);
+  const rand = rng(20260621);
   const groups: GGroup[] = [
-    { id: "auth",   label: "auth/",         color: "#4c8dff", desc: "Identity, sessions and key rotation." },
-    { id: "pay",    label: "payments/",     color: "#e3934d", desc: "Billing, ledger and payouts." },
-    { id: "engine", label: "graph-engine/", color: "#57ab5a", desc: "Indexing, diffing and the secret scanner." },
-    { id: "ui",     label: "ui/",           color: "#db61a2", desc: "Canvas, panels and the editor surface." },
-    { id: "docs",   label: "docs/",         color: "#8b949e", desc: "Specs, ADRs and onboarding." },
-    { id: "tests",  label: "tests/",        color: "#a371f7", desc: "Unit and end-to-end coverage." },
+    { id: "pipeline",  label: "pipeline/",  color: "#4c8dff", desc: "Turn ingestion, queue production, session-event detection." },
+    { id: "agents",    label: "agents/",    color: "#e3934d", desc: "Scribe, Note Creator, Connector, Orchestrator uAgent." },
+    { id: "storage",   label: "storage/",   color: "#57ab5a", desc: "Redis streams, pub/sub, vector memory, vault layout." },
+    { id: "contracts", label: "contracts/", color: "#db61a2", desc: "Frozen type schemas, agent message shapes, field parity." },
+    { id: "webapp",    label: "webapp/",    color: "#8b949e", desc: "Graph canvas, merge UI, SSE events, five display states." },
+    { id: "security",  label: "security/",  color: "#a371f7", desc: "scanForSecrets, pre-commit hook, handoff gate." },
   ];
   const pools: Record<string, string[]> = {
-    auth:   ["oauth-callback.ts","session-store.ts","rotate-keys.ts","jwt-verify.ts","login-flow.md","sso-saml.ts","mfa-totp.ts","token-cache.ts","rbac-policy.ts","password-reset.ts","device-trust.ts"],
-    pay:    ["stripe-webhook.ts","invoice-pdf.ts","refund-queue.ts","tax-calc.ts","ledger.ts","payout-cron.ts","dunning.md","currency-fx.ts","checkout-intent.ts","receipt-mail.ts"],
-    engine: ["force-layout.ts","wikilink-parser.ts","graph-index.ts","diff-merge.ts","scan-secrets.ts","commit-hook.ts","watcher.ts","frontmatter.ts","node-store.ts","edge-resolver.ts","stream-bus.ts"],
-    ui:     ["graph-canvas.tsx","node-panel.tsx","intent-log.tsx","handoff-screen.tsx","toolbar.tsx","toast.tsx","filter-rail.tsx","editor.tsx","status-pill.tsx"],
-    docs:   ["architecture.md","threat-model.md","onboarding.md","hooks-spec.md","glossary.md","adr-001.md","readme.md"],
-    tests:  ["scan-secrets.test.ts","merge.test.ts","layout.test.ts","e2e-handoff.spec.ts","parser.test.ts"],
+    pipeline:  ["turn-ingestion","claude-hook","codex-hook","session-start","session-end","transcript-reader","queue-producer","sessionstate-writer","compaction-detect","intent-shift"],
+    agents:    ["orchestrator","scribe","note-creator","connector","fetch-ai-uagent","arize-telemetry","agentverse","asi-one-intents"],
+    storage:   ["redis-streams","vault-layout","node-store","intent-log","session-state","vault-index","redis-pubsub","vector-memory","consumer-group","constraints"],
+    contracts: ["types-ts","contracts-py","queue-item","scribe-result","node-written","link-result","turn-progress","node-changed-event"],
+    webapp:    ["graph-canvas","merge-page","intent-page","sse-endpoint","node-panel","conflict-resolver","setup-page","agent-chat"],
+    security:  ["scan-secrets","pre-commit-hook","handoff-gate","secret-patterns","write-time-scan","blocked-display"],
   };
-  const blocked: Record<string, boolean> = { "rotate-keys.ts": true, "stripe-webhook.ts": true };
-  const pending: Record<string, boolean> = { "scan-secrets.ts": true, "node-panel.tsx": true, "ledger.ts": true, "jwt-verify.ts": true, "graph-index.ts": true, "threat-model.md": true, "checkout-intent.ts": true, "editor.tsx": true, "diff-merge.ts": true };
-  const created = ["just now","2m ago","9m ago","26m ago","1h ago","3h ago","5h ago","yesterday","2d ago"];
+
+  // blocked = scanForSecrets flagged a secret; pending = not yet approved / in progress
+  const blocked: Record<string, boolean> = { "arize-telemetry": true, "session-state": true };
+  const pending: Record<string, boolean> = {
+    "note-creator": true, "fetch-ai-uagent": true, "asi-one-intents": true,
+    "vector-memory": true, "intent-shift": true,
+    "merge-page": true, "intent-page": true, "sse-endpoint": true, "node-panel": true,
+  };
 
   const cx0 = 500, cy0 = 380, RX = 300, RY = 235;
   const nodes: GNode[] = [];
@@ -140,9 +535,18 @@ function buildGraph() {
 
   const add = (n: GNode) => { nodes.push(n); byId[n.id] = n; return n; };
 
-  add({ id: "center", label: "trust-graph-v1", group: "intent", groupColor: "#9aa4b2",
+  add({
+    id: "center", label: "ship-trust-graph", group: "intent", groupColor: "#9aa4b2",
     status: "pending", cx: cx0, cy: cy0, r: 24, isCenter: true, isHub: true,
-    type: "intent", created: "session start", intentRef: "—", orphan: false, deg: 0 });
+    nodeId: "2026-06-21-1430-ship-trust-graph",
+    nodeType: "goal",
+    title: "Ship VaultMind trust graph demo",
+    created: "2026-06-21T14:30:00-07:00",
+    sourceTool: "claude-code", sourceSession: "4c7d2831-bb92",
+    intentRef: "2026-06-21 14:30", reviewStatus: "pending",
+    related: ["[[contracts-py]]", "[[types-ts]]", "[[TechStack]]"],
+    flags: [], orphan: false, deg: 0,
+  });
 
   groups.forEach((grp, gi) => {
     const ang = (gi / groups.length) * Math.PI * 2 - Math.PI / 2;
@@ -162,13 +566,23 @@ function buildGraph() {
       x = Math.max(46, Math.min(954, x));
       y = Math.max(48, Math.min(712, y));
       const status = blocked[name] ? "blocked" : (pending[name] ? "pending" : "clean");
+      const key = `${grp.id}:${name}`;
+      const meta = NODE_META[key];
       const node = add({
-        id: grp.id + ":" + name, label: name, group: grp.id, groupColor: grp.color,
+        id: key, label: name, group: grp.id, groupColor: grp.color,
         status: status as "clean" | "pending" | "blocked",
         cx: x, cy: y, r: 0, isHub,
-        type: name.endsWith(".md") ? "note" : "file",
-        created: created[(gi * 3 + idx) % created.length],
-        intentRef: "trust-graph-v1", orphan: false, deg: 0,
+        nodeId: meta?.nodeId ?? `2026-06-18-0000-${name}`,
+        nodeType: meta?.nodeType ?? "decision",
+        title: meta?.title ?? name,
+        created: "2026-06-18T10:00:00-07:00",
+        sourceTool: meta?.sourceTool ?? "claude-code",
+        sourceSession: meta?.sourceSession ?? "00893aaf-19fa",
+        intentRef: meta?.intentRef ?? "2026-06-18 10:15",
+        reviewStatus: meta?.reviewStatus ?? "approved",
+        related: meta?.related ?? [],
+        flags: blocked[name] ? ["secret-detected"] : (meta?.flags ?? []),
+        orphan: false, deg: 0,
       });
       if (isHub) {
         edges.push({ a: "center", b: node.id, spoke: true });
@@ -191,13 +605,33 @@ function buildGraph() {
     if (a !== b && byId[a] && byId[b] && byId[a].group !== byId[b].group) edges.push({ a, b, cross: true });
   }
 
-  const orphanNames = ["scratch-2026-06-18.md","tmp-export.json","untitled.md","clipboard.md","draft-notes.md","wip.ts"];
-  orphanNames.forEach((nm, i) => {
+  const orphanData = [
+    { name: "scratch-redis-bench.md",     nodeId: "2026-06-18-1300-scratch-redis-bench",     title: "Scratch: Redis Streams vs Celery latency numbers" },
+    { name: "wip-arize-setup.md",         nodeId: "2026-06-19-0800-wip-arize-setup",         title: "WIP: Arize Phoenix SDK setup notes" },
+    { name: "draft-handoff-prompt.md",    nodeId: "2026-06-20-1000-draft-handoff-prompt",    title: "Draft: handoff prompt wording for ASI:One" },
+    { name: "tmp-scribe-prompt-v2.md",    nodeId: "2026-06-20-1500-tmp-scribe-prompt-v2",    title: "Temp: Scribe extraction prompt iteration v2" },
+    { name: "untitled.md",                nodeId: "2026-06-21-0900-untitled",                title: "Untitled note" },
+    { name: "clipboard.md",               nodeId: "2026-06-21-1100-clipboard",               title: "Clipboard scratch" },
+  ];
+  const orphanCreated = [
+    "2026-06-18T13:00:00-07:00", "2026-06-19T08:00:00-07:00",
+    "2026-06-20T10:00:00-07:00", "2026-06-20T15:00:00-07:00",
+    "2026-06-21T09:00:00-07:00", "2026-06-21T11:00:00-07:00",
+  ];
+  orphanData.forEach((o, i) => {
     const a = rand() * Math.PI * 2, d = 300 + rand() * 70;
-    add({ id: "orphan:" + nm, label: nm, group: "docs", groupColor: "#6e7681", status: "clean",
+    add({
+      id: "orphan:" + o.name, label: o.name, group: "docs", groupColor: "#6e7681", status: "clean",
       cx: Math.max(46, Math.min(954, cx0 + Math.cos(a) * d)),
       cy: Math.max(48, Math.min(712, cy0 + Math.sin(a) * d * 0.78)),
-      r: 0, type: "note", created: created[i % created.length], intentRef: "—", orphan: true, isHub: false, deg: 0 });
+      r: 0,
+      nodeId: o.nodeId, nodeType: "question", title: o.title,
+      created: orphanCreated[i] ?? "2026-06-21T09:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "4c7d2831-bb92",
+      intentRef: "2026-06-21 14:32", reviewStatus: "pending",
+      related: [], flags: [],
+      orphan: true, isHub: false, deg: 0,
+    });
   });
 
   edges.forEach(e => {
@@ -252,17 +686,35 @@ function scanForSecrets(text: string): { m: string; snippet: string } | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Content generator — produces proper AC-1 YAML frontmatter + body
+// ---------------------------------------------------------------------------
+
 function contentFor(node: GNode, overrides: Record<string, { status?: string; content?: string }>): string {
   const ov = overrides[node.id];
   if (ov?.content != null) return ov.content;
-  if (node.label === "rotate-keys.ts")
-    return `// rotate-keys.ts\nimport { refreshFromVault } from "./vault";\n\nexport const AWS_SECRET_ACCESS_KEY =\n  "REDACTED_EXAMPLE_KEY";\n\nexport function rotate() {\n  return refreshFromVault(AWS_SECRET_ACCESS_KEY);\n}`;
-  if (node.label === "stripe-webhook.ts")
-    return `// stripe-webhook.ts\nconst STRIPE_SECRET = "REDACTED_EXAMPLE_KEY";\n\nexport function verify(req) {\n  return stripe.webhooks.constructEvent(\n    req.body, req.headers["stripe-signature"], STRIPE_SECRET\n  );\n}`;
-  if (node.isCenter)
-    return `---\nintent: ship the trust graph\nstatus: in progress\n---\n\nThe live map of everything the agent has\ntouched this session. Nodes commit on Stop;\nhandoff fires on SessionEnd.\n\nLinked from every working file below.`;
+
+  const relatedYaml = node.related.length
+    ? node.related.map(r => `  - "${r}"`).join("\n")
+    : "  []";
+  const flagsYaml = node.flags.length ? `[${node.flags.join(", ")}]` : "[]";
+
+  const fm = `---\nid: ${node.nodeId}\ntype: ${node.nodeType}\ntitle: ${node.title}\ncreated: ${node.created}\nsource_tool: ${node.sourceTool}\nsource_session: ${node.sourceSession}\nintent_ref: ${node.intentRef}\nstatus: ${node.reviewStatus}\nrelated:\n${relatedYaml}\nflags: ${flagsYaml}\n---`;
+
+  if (node.label === "arize-telemetry") {
+    return `${fm}\n\nAll agents emit OpenTelemetry traces to Arize Phoenix for observability.\n\n\`\`\`python\nimport phoenix as px\n\nARIZE_API_KEY = "ak_live_xK9mPqR3nJvWdL8tYzCbE2sF"\n\npx.launch_app(\n    collector_endpoint="https://arize.internal",\n    api_key=ARIZE_API_KEY,\n)\n\`\`\`\n\n> Remove hardcoded key and load from environment before this node can commit.`;
+  }
+
+  if (node.label === "session-state") {
+    return `${fm}\n\nSessionState.md records session-event rows and compaction flags deterministically.\n\n\`\`\`python\nREDIS_URL = "redis://:session_secret_abc123@prod-redis.internal:6379"\n\ndef write_state(entry: str):\n    client = redis.from_url(REDIS_URL)\n    # atomic write-temp-rename + .lock sentinel\n\`\`\`\n\n> Hardcoded Redis password detected — load from env before this node can commit.`;
+  }
+
+  if (node.isCenter) {
+    return `${fm}\n\nThe live trust graph showing every decision, constraint, and goal the agents have captured this session. Nodes commit on Stop; handoff fires on SessionEnd.\n\nLinked from every active node below.`;
+  }
+
   const grp = G.groups.find(x => x.id === node.group);
-  return `# ${node.label}\n\nLinked from [[trust-graph-v1]].\n\n${grp?.desc ?? ""}\n\n- status: ${node.status}\n- owner: @agent\n- last touched by the watcher`;
+  return `${fm}\n\n${node.title}.\n\n> Linked from [[ship-trust-graph]].\n\n${grp?.desc ?? ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,17 +766,15 @@ export default function GraphPage() {
     return n.status;
   }, [overrides]);
 
-  // Visibility
   const visible = G.nodes.filter(n => n.orphan ? toggles.orphans : true);
 
-  // Active set
   const q = query.trim().toLowerCase();
   let activeSet: Set<string> | null = null;
   if (selectedId) {
     activeSet = new Set([selectedId]);
     (G.neighbors[selectedId] || new Set()).forEach(x => activeSet!.add(x));
   } else if (q) {
-    activeSet = new Set(visible.filter(n => n.label.toLowerCase().includes(q)).map(n => n.id));
+    activeSet = new Set(visible.filter(n => n.label.toLowerCase().includes(q) || n.title.toLowerCase().includes(q)).map(n => n.id));
   } else if (hoverId) {
     activeSet = new Set([hoverId]);
     (G.neighbors[hoverId] || new Set()).forEach(x => activeSet!.add(x));
@@ -336,7 +786,6 @@ export default function GraphPage() {
   const isActive = (id: string) => activeSet ? activeSet.has(id) : true;
   const hasFocus = !!(selectedId || q || activeGroup || activeStatus);
 
-  // Counts
   const counts = { clean: 0, pending: 0, blocked: 0 };
   visible.forEach(n => { counts[effStatus(n)] = (counts[effStatus(n)] || 0) + 1; });
 
@@ -434,7 +883,7 @@ export default function GraphPage() {
             {/* Color groups */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 4px 8px" }}>
               <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--faint)" }}>Color groups</span>
-              <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>by path</span>
+              <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>by module</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {G.groups.map(g => {
@@ -611,13 +1060,14 @@ export default function GraphPage() {
                 pointerEvents: "none", transform: "translate(-50%, calc(-100% - 12px))",
                 background: "rgba(13,17,23,.96)", border: "1px solid var(--border)",
                 borderRadius: 9, padding: "9px 11px", boxShadow: "0 8px 24px rgba(1,4,9,.6)",
-                minWidth: 160, maxWidth: 230,
+                minWidth: 180, maxWidth: 280,
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: stDef.dot, boxShadow: `0 0 0 3px ${stDef.glow}` }} />
                   <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12.5, color: "#e6edf3", fontWeight: 500 }}>{n.label}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: "#7d8590" }}>{path}</div>
+                <div style={{ fontSize: 11.5, color: "#c9d1d9", marginBottom: 3, lineHeight: 1.4 }}>{n.title}</div>
+                <div style={{ fontSize: 11, color: "#7d8590" }}>{path}</div>
                 <div style={{ marginTop: 5, fontSize: 11.5, color: stDef.color }}>{stDef.label} — {stDef.why}</div>
               </div>
             );
@@ -629,23 +1079,33 @@ export default function GraphPage() {
             const stDef = STATUS[st];
             const grp = G.groups.find(x => x.id === selected.group);
             const path = selected.isCenter
-              ? ".vaultmind/intents/trust-graph-v1.md"
-              : (selected.orphan ? "(unlinked) " + selected.label : (grp?.label ?? "") + selected.label);
+              ? "vault/nodes/ship-trust-graph.md"
+              : (selected.orphan ? "(unlinked) " + selected.label : (grp?.label ?? "") + selected.nodeId + ".md");
             const nodeContent = contentFor(selected, overrides);
-            const neigh = [...(G.neighbors[selected.id] || new Set())]
-              .filter(id => id !== "center").slice(0, 4)
-              .map(id => G.byId[id]).filter(Boolean);
-            const fm = [
-              { k: "type",       v: selected.type,       color: "var(--text)" },
-              { k: "status",     v: st,                  color: stDef.color },
-              { k: "created",    v: selected.created,    color: "var(--muted)" },
-              { k: "intent_ref", v: selected.intentRef,  color: "var(--accent)" },
-            ];
             const canCommit = !!commitMsg.trim();
+
+            // Build related chips: resolve wikilinks to graph nodes where possible
+            const relatedChips = selected.related.map(link => {
+              const slug = link.replace(/^\[\[/, "").replace(/\]\]$/, "");
+              const match = Object.values(G.byId).find(n => n.label === slug || n.nodeId.endsWith(`-${slug}`));
+              return { slug, match };
+            });
+
+            const fm = [
+              { k: "id",             v: selected.nodeId,        color: "var(--muted)" },
+              { k: "type",           v: selected.nodeType,      color: "var(--accent)" },
+              { k: "title",          v: selected.title,         color: "var(--text)" },
+              { k: "created",        v: selected.created,       color: "var(--muted)" },
+              { k: "source_tool",    v: selected.sourceTool,    color: "var(--text)" },
+              { k: "source_session", v: selected.sourceSession, color: "var(--muted)" },
+              { k: "intent_ref",     v: selected.intentRef,     color: "var(--accent)" },
+              { k: "status",         v: selected.reviewStatus,  color: selected.reviewStatus === "approved" ? "var(--green)" : "var(--amber)" },
+              { k: "flags",          v: selected.flags.length ? selected.flags.join(", ") : "[]", color: selected.flags.length ? "var(--red)" : "var(--faint)" },
+            ];
 
             return (
               <div style={{
-                position: "absolute", top: 0, right: 0, bottom: 0, width: 392, maxWidth: "88vw",
+                position: "absolute", top: 0, right: 0, bottom: 0, width: 420, maxWidth: "88vw",
                 background: "var(--surface)", borderLeft: "1px solid var(--border)",
                 boxShadow: "-12px 0 32px rgba(1,4,9,.35)",
                 display: "flex", flexDirection: "column", zIndex: 20,
@@ -658,9 +1118,15 @@ export default function GraphPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                         <span style={{ width: 10, height: 10, borderRadius: "50%", background: stDef.dot, boxShadow: `0 0 0 3px ${stDef.glow}` }} />
                         <span style={{ fontSize: 11.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", color: stDef.color }}>{stDef.label}</span>
+                        <span style={{
+                          padding: "1px 7px", borderRadius: 4, fontSize: 11, fontWeight: 600,
+                          background: "var(--inset)", border: "1px solid var(--border-muted)",
+                          color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono, monospace)",
+                        }}>{selected.nodeType}</span>
                       </div>
-                      <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: "-.2px", fontFamily: "var(--font-jetbrains-mono, monospace)", wordBreak: "break-all" }}>{selected.label}</h2>
-                      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{path}</div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: "-.2px", fontFamily: "var(--font-jetbrains-mono, monospace)", wordBreak: "break-all" }}>{selected.label}</h2>
+                      <div style={{ fontSize: 11.5, color: "var(--text)", marginTop: 3, lineHeight: 1.4 }}>{selected.title}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{path}</div>
                     </div>
                     <button onClick={() => { setSelectedId(null); setEditing(false); setWarning(null); }} style={{
                       flexShrink: 0, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
@@ -678,10 +1144,10 @@ export default function GraphPage() {
                         Secret detected — save blocked
                       </div>
                       <div style={{ fontSize: 12.5, color: "var(--text)" }}>
-                        {selected.label === "stripe-webhook.ts"
-                          ? "A Stripe live key (sk_live_…) is hardcoded on line 2."
-                          : "An AWS secret access key is hardcoded in this file."
-                        } Remove it and re-scan before this node can commit.
+                        {selected.label === "arize-telemetry"
+                          ? "A hardcoded Arize API key (ak_live_…) is present in this node. Remove it and re-scan before this node can commit."
+                          : "A hardcoded Redis password is present in this node. Load credentials from environment before this node can commit."
+                        }
                       </div>
                     </div>
                   )}
@@ -757,32 +1223,38 @@ export default function GraphPage() {
                       </div>
 
                       <div style={{ padding: "8px 16px 6px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--faint)", marginBottom: 8 }}>Frontmatter</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--faint)", marginBottom: 8 }}>Frontmatter (AC-1)</div>
                         <div style={{ background: "var(--inset)", border: "1px solid var(--border)", borderRadius: 9, overflow: "hidden" }}>
                           {fm.map(f => (
-                            <div key={f.k} style={{ display: "flex", gap: 12, padding: "8px 12px", borderBottom: "1px solid var(--border-muted)" }}>
-                              <span style={{ flexShrink: 0, width: 96, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--muted)" }}>{f.k}</span>
-                              <span style={{ flex: 1, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: f.color, wordBreak: "break-word" }}>{f.v}</span>
+                            <div key={f.k} style={{ display: "flex", gap: 12, padding: "7px 12px", borderBottom: "1px solid var(--border-muted)" }}>
+                              <span style={{ flexShrink: 0, width: 108, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 11.5, color: "var(--muted)" }}>{f.k}</span>
+                              <span style={{ flex: 1, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 11.5, color: f.color, wordBreak: "break-word" }}>{f.v}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <div style={{ padding: "8px 16px 6px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--faint)", marginBottom: 8 }}>Related topics</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                          {(neigh.length ? neigh : [G.byId["center"]]).filter(Boolean).map(m => (
-                            <span key={m.id} onClick={() => { setSelectedId(m.id); setEditing(false); }} style={{
-                              display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px",
-                              background: "var(--inset)", border: "1px solid var(--border)", borderRadius: 9999,
-                              fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--accent)", cursor: "pointer",
-                            }}>
-                              <span style={{ width: 7, height: 7, borderRadius: "50%", background: m.groupColor }} />
-                              {m.label}
-                            </span>
-                          ))}
+                      {selected.related.length > 0 && (
+                        <div style={{ padding: "8px 16px 6px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--faint)", marginBottom: 8 }}>Related nodes</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                            {relatedChips.map(({ slug, match }) => (
+                              <span key={slug}
+                                onClick={match ? () => { setSelectedId(match.id); setEditing(false); } : undefined}
+                                style={{
+                                  display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px",
+                                  background: "var(--inset)", border: "1px solid var(--border)", borderRadius: 9999,
+                                  fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12,
+                                  color: match ? "var(--accent)" : "var(--muted)",
+                                  cursor: match ? "pointer" : "default",
+                                }}>
+                                {match && <span style={{ width: 7, height: 7, borderRadius: "50%", background: match.groupColor }} />}
+                                {slug}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div style={{ padding: "14px 16px 18px" }}>
                         <button onClick={() => { setEditing(true); setDraft(nodeContent); setWarning(null); setCommitMsg(""); }} style={{
