@@ -91,13 +91,13 @@ function VaultIcon() {
   );
 }
 
-function GraphIcon() {
+function GraphIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <circle cx="6" cy="6" r="2.4" stroke="currentColor" strokeWidth="2" />
-      <circle cx="6" cy="18" r="2.4" stroke="currentColor" strokeWidth="2" />
-      <circle cx="18" cy="12" r="2.4" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 8.4v7.2M8.2 6h4a3.6 3.6 0 0 1 3.6 3.6V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="6" cy="6" r="2.4" stroke={color} strokeWidth="2" />
+      <circle cx="6" cy="18" r="2.4" stroke={color} strokeWidth="2" />
+      <circle cx="18" cy="12" r="2.4" stroke={color} strokeWidth="2" />
+      <path d="M6 8.4v7.2M8.2 6h4a3.6 3.6 0 0 1 3.6 3.6V12" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -256,6 +256,13 @@ export default function MergePage() {
     }
   };
 
+  const handleApplySuggestion = () => {
+    const suggested: Resolutions = {};
+    hunks.forEach((h) => { suggested[h.index] = "theirs"; });
+    setResolutions(suggested);
+    showToast("Applied: accepted all incoming changes", "info");
+  };
+
   const hasConflicts = summaries !== null && summaries.length > 0;
   const noConflicts = summaries !== null && summaries.length === 0;
 
@@ -313,7 +320,7 @@ export default function MergePage() {
           <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", padding: "16px 24px", borderBottom: `1px solid ${v("--border")}`, background: v("--surface-2") }}>
             <div style={{ display: "flex", alignItems: "center", gap: 13, minWidth: 0 }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: v("--amber-dim"), display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                <GraphIcon />
+                <GraphIcon size={17} color="var(--amber)" />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
@@ -557,8 +564,14 @@ export default function MergePage() {
                   VaultMind suggests
                 </div>
                 <div style={{ fontSize: 12, color: v("--muted"), lineHeight: 1.6 }}>
-                  Review each hunk carefully. Prefer the <b style={{ color: v("--text") }}>incoming</b> change if it was written later and addresses the same concern — that avoids losing recent context.
+                  Prefer the <b style={{ color: v("--text") }}>incoming</b> changes — they reflect the most recent session and avoid losing context captured after this branch diverged.
                 </div>
+                <button
+                  onClick={handleApplySuggestion}
+                  style={{ width: "100%", marginTop: 11, padding: 8, background: v("--surface-2"), border: `1px solid ${v("--border")}`, borderRadius: 7, color: v("--text"), fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                >
+                  Apply suggestion
+                </button>
               </div>
             </aside>
           </main>
