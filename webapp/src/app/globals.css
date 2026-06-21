@@ -8,74 +8,73 @@
 
 /* ---- DARK (default): ink ------------------------------------------------ */
 :root {
-  --bg:            #0d0f13;
-  --surface:       rgba(255, 255, 255, 0.045);
-  --surface-2:     rgba(255, 255, 255, 0.025);
-  --inset:         rgba(0, 0, 0, 0.38);
-  --border:        rgba(255, 255, 255, 0.11);
-  --border-muted:  rgba(255, 255, 255, 0.06);
-  --text:          #e9eaec;
-  --muted:         #8a9099;
-  --faint:         #565b63;
-  --accent:        #5b8cff;
-  --accent-btn:    #2f5fe0;
-  --accent-btn-hover: #4476ee;
-  --accent-fg:     #ffffff;
-  --green:         #46c98a;
-  --green-dim:     rgba(70, 201, 138, 0.13);
-  --green-line:    rgba(70, 201, 138, 0.12);
-  --amber:         #dba53f;
-  --amber-dim:     rgba(219, 165, 63, 0.15);
-  --red:           #f26d78;
-  --red-dim:       rgba(242, 109, 120, 0.13);
-  --blue-line:     rgba(91, 140, 255, 0.14);
-  /* "purple" slot repurposed to teal so any legacy references stay on-palette */
-  --purple:        #3cc6cf;
-  --purple-line:   rgba(60, 198, 207, 0.14);
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #0d1117;
+  --inset: #010409;
+  --border: #30363d;
+  --border-muted: #21262d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --faint: #484f58;
+  --accent: #388bfd;
+  --accent-btn: #1f6feb;
+  --accent-btn-hover: #388bfd;
+  --accent-fg: #ffffff;
+  --green: #3fb950;
+  --green-dim: rgba(63, 185, 80, 0.15);
+  --green-line: rgba(63, 185, 80, 0.12);
+  --amber: #d29922;
+  --amber-dim: rgba(210, 153, 34, 0.15);
+  --red: #f85149;
+  --red-dim: rgba(248, 81, 73, 0.12);
+  --blue-line: rgba(56, 139, 253, 0.12);
+  --purple: #a371f7;
+  --purple-line: rgba(163, 113, 247, 0.12);
 
-  --background: #0d0f13;
-  --foreground: #e9eaec;
+  --background: #0d1117;
+  --foreground: #e6edf3;
 }
 
 /* ---- LIGHT: paper ------------------------------------------------------- */
 :root[data-vmtheme="light"] {
-  --bg:            #eceef1;
-  --surface:       rgba(255, 255, 255, 0.62);
-  --surface-2:     rgba(255, 255, 255, 0.42);
-  --inset:         rgba(255, 255, 255, 0.35);
-  --border:        rgba(20, 24, 33, 0.13);
-  --border-muted:  rgba(20, 24, 33, 0.07);
-  --text:          #16181d;
-  --muted:         #565c66;
-  --faint:         #8a909a;
-  --accent:        #2f5fe0;
-  --accent-btn:    #2f5fe0;
-  --accent-btn-hover: #2450c8;
-  --accent-fg:     #ffffff;
-  --green:         #0f8f63;
-  --green-dim:     rgba(15, 143, 99, 0.12);
-  --green-line:    rgba(15, 143, 99, 0.10);
-  --amber:         #9a6a10;
-  --amber-dim:     rgba(154, 106, 16, 0.12);
-  --red:           #d23b48;
-  --red-dim:       rgba(210, 59, 72, 0.10);
-  --blue-line:     rgba(47, 95, 224, 0.12);
-  --purple:        #0d8f97;
-  --purple-line:   rgba(13, 143, 151, 0.12);
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --surface-2: #ffffff;
+  --inset: #f6f8fa;
+  --border: #d1d9e0;
+  --border-muted: #d8dee4;
+  --text: #1f2328;
+  --muted: #59636e;
+  --faint: #818b98;
+  --accent: #0969da;
+  --accent-btn: #1f6feb;
+  --accent-btn-hover: #0969da;
+  --accent-fg: #ffffff;
+  --green: #1a7f37;
+  --green-dim: rgba(26, 127, 55, 0.12);
+  --green-line: rgba(26, 127, 55, 0.1);
+  --amber: #9a6700;
+  --amber-dim: rgba(154, 103, 0, 0.12);
+  --red: #cf222e;
+  --red-dim: rgba(207, 34, 46, 0.1);
+  --blue-line: rgba(9, 105, 218, 0.1);
+  --purple: #8250df;
+  --purple-line: rgba(130, 80, 223, 0.1);
 
-  --background: #eceef1;
-  --foreground: #16181d;
+  --background: #ffffff;
+  --foreground: #1f2328;
 }
 
 /* ---- Tailwind theme bridge --------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans:    var(--font-space-grotesk);
-  --font-mono:    var(--font-space-grotesk);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-space-grotesk);
   --font-jetbrains-mono: var(--font-space-grotesk);
-  --font-geist-sans:     var(--font-space-grotesk);
-  --font-geist-mono:     var(--font-space-grotesk);
+  --font-geist-sans: var(--font-space-grotesk);
+  --font-geist-mono: var(--font-space-grotesk);
 }
 
 /* Hard alias the legacy font slots to Space Grotesk in plain CSS too, so every
@@ -83,8 +82,8 @@
    to Space Grotesk even if a build step skips the @theme emission. */
 :root {
   --font-jetbrains-mono: var(--font-space-grotesk);
-  --font-geist-sans:     var(--font-space-grotesk);
-  --font-geist-mono:     var(--font-space-grotesk);
+  --font-geist-sans: var(--font-space-grotesk);
+  --font-geist-mono: var(--font-space-grotesk);
 }
 
 * {
@@ -137,7 +136,7 @@ button:active { transform: translateY(1px) scale(0.99); }
 }
 
 ::selection {
-  background: rgba(91, 140, 255, 0.30);
+  background: rgba(56, 139, 253, 0.30);
   color: #fff;
 }
 
