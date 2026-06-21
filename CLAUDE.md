@@ -4,13 +4,20 @@ Persistent, structured project memory in Obsidian-compatible Markdown, transfera
 tools (Claude Code, Codex, Gemini) without late-stage summarization. A multi-agent pipeline
 writes a git-native vault as you work; a trust UI lets you review and hand off.
 
+> **This file is the brief for both human sessions (Claude Code) and Devin Cloud sessions.**
+> The standing rules and execution rules below apply to all readers; the only difference is
+> executor — Devin for foundation Buckets 2–4 and streams P1–P3, human for P4.
+
 ## Read these first (don't re-derive them)
 - **`SPEC.md`** — the technical contract: node schema, the six agent message contracts, the four
-  file formats, `scanForSecrets`, hook configs, the session-end resolution, and the buckets.
+  file formats, `scanForSecrets`, hook configs, the session-end resolution, the buckets, and the
+  **Execution Model** (roles, bucket-approval protocol, ACU allocation, the Bucket-5 trigger gate,
+  and the AC-1…AC-8 unchanged note).
 - **`WORKSTREAMS.md`** — who runs what session, what's mockable in isolation, when each seam goes
-  live (checkpoints, not deadlines), and per-session task order. Find your stream here.
+  live (checkpoints, not deadlines), per-session task order, per-bucket acceptance criteria, ACU
+  table, and failure modes. Find your stream here.
 
-## Standing rules (everyone, always)
+## Standing rules (everyone, always — human or Devin session)
 1. **Never let a downstream LLM touch the Scribe's content.** The Note Creator wraps the Scribe's
    extraction verbatim; the Connector edits **only** frontmatter `related` — never the body. The
    body is immutable after write.
@@ -25,6 +32,27 @@ writes a git-native vault as you work; a trust UI lets you review and hand off.
    blocks commit *and* handoff in both Auto and Review modes.
 6. **Concurrent-write safety:** appends to `IntentLog.md` / `SessionState.md` use atomic
    write-temp-rename + a `.lock` sentinel (test required — see WORKSTREAMS.md).
+
+## Execution-model rules (Devin sessions — foundation Buckets 2–4, and streams P1, P2, P3)
+These rules also apply to human sessions working on any of these streams.
+
+- **Hard-stop per bucket.** Complete exactly one bucket, post the diff, and halt until a human
+  approves and merges via **Devin Review**. Do not begin the next bucket without that approval.
+  ("Devin Review" is the interface a human reviewer uses — not Devin reviewing itself.)
+- **Halt-on-ambiguity.** If a bucket is underspecified or a frozen contract appears to need
+  changing, stop and surface the question. Never guess or invent an interface.
+- **Stay-in-lane.** Touch only your session's owned files. Never edit `contracts.py` /
+  `types.ts` or another session's files. File ownership per stream is in `WORKSTREAMS.md`.
+- **No account or publish credentials.** Agentverse registration, the ASI:One shared-chat URL,
+  and the demo video are human-owned tasks that require account credentials. A Devin session
+  must never be handed these credentials and must never attempt those tasks.
+- **ACU-awareness.** Each session has a soft-cap budget (allocation table in `SPEC.md`
+  §Execution Model and `WORKSTREAMS.md` §ACU allocation). At ~80% of the allocation, surface a
+  burn alert and await human approval before drawing from the shared reserve. A session that
+  would exceed even the shared reserve is paused at its next Devin Review boundary; the owner
+  finishes by hand.
+- **P4 is never executed by Devin.** The web-app stream (P4) is human-only — deliberate, not a
+  budget cut. No Devin session is created for it.
 
 ## Stack
 Python pipeline + hooks + Orchestrator (a published Fetch.AI uAgent); TypeScript / Next.js
@@ -45,14 +73,9 @@ all agents. The only cross-language seams are `vault/*.md` on disk and Redis.
 VaultMind vault page (NodeChangedEvent live list), redis npm package, root package.json,
 scripts/start.sh. TypeScript compiles clean (tsc --noEmit exit 0). webapp/types.ts preserved.
 
-## Devin execution rules (foundation Buckets 2–4, and streams P1, P2, P3)
-- **Hard-stop per bucket.** Complete exactly one bucket, post the diff, and halt until a human
-  approves and merges via Devin Review. Do not begin the next bucket without that approval.
-- **Halt-on-ambiguity.** If a bucket is underspecified or a frozen contract appears to need
-  changing, stop and surface the question. Never guess or invent an interface.
-- **Stay-in-lane.** Touch only your session's owned files. Never edit `contracts.py` /
-  `types.ts` or another session's files.
-- **No account or publish credentials.** Agentverse registration, the ASI:One shared-chat URL,
-  and the demo video are human-owned tasks. Never request or use account credentials.
-- **ACU-awareness.** Each session has a soft-cap budget. If you approach it, surface the alert
-  and await human approval before drawing from the shared reserve.
+2026-06-20 — Execution-model pivot (DEVIN-PIVOT-SPEC.md): updated SPEC.md, WORKSTREAMS.md, and
+CLAUDE.md to reflect Devin Cloud as the executor for foundation Buckets 2–4 and streams P1–P3;
+added Execution Model section to SPEC.md (roles, ACU allocation, bucket-approval protocol,
+Bucket-5 trigger gate, AC-1…AC-8 unchanged note); hardened WORKSTREAMS.md stream briefs with
+per-bucket AC, ACU soft-caps, failure modes, and cross-executor B↔D concurrent-write note;
+updated CLAUDE.md to serve as dual brief (human + Devin) with full execution-model rules.

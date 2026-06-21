@@ -2,7 +2,14 @@
 
 > Source of truth for the technical build. Product/architecture rationale lives in the
 > proposal (`vaultmind_proposal.md` — PDF version, 20pp, the current one). This document
-> does not re-argue the product; it pins the **byte-level contracts** four sessions build against.
+> does not re-argue the product; it pins the **byte-level contracts** the sessions build against.
+>
+> **Execution model note:** Devin Cloud sessions execute foundation Buckets 2–4 and streams
+> P1–P3; a human Claude Code session executes P4 only. AC-1…AC-8 and the Stack
+> non-negotiables are **byte-unchanged** from the original spec — they are the precondition that
+> makes unattended Devin execution safe (an ambiguous seam is manageable when a human can ask
+> a clarifying question mid-build; it is a real risk when cloud agents run unattended against a
+> shared repo). See the **Execution Model** section below for the full protocol.
 
 ---
 
@@ -10,15 +17,20 @@
 
 The proposal settled the product and architecture. What it left as prose — "the hook drops
 turns into a lightweight queue," "finalize API contracts between the four agents," "define
-the `.md` node schema" — is exactly what blocks four sessions from building in parallel without
+the `.md` node schema" — is exactly what blocks sessions from building in parallel without
 colliding.
 
 This spec's one job is **parallel-safe seams**: freeze every interface that crosses a
-session-boundary (queue format, agent message contracts, node + file schemas,
+session boundary (queue format, agent message contracts, node + file schemas,
 `scanForSecrets` signature, hook configs, the live-event bus) into concrete shapes, so each
-owner builds and tests in isolation against mocks and integrates around hour 10 with no
-rework. Success = **nobody is ever blocked waiting on someone else's undecided interface**,
-and the seams are *demonstrated* working (Bucket 5), not merely documented.
+session builds and tests in isolation against mocks and integrates around hour 10 with no
+rework. Success = **no session is ever blocked waiting on another session's undecided
+interface**, and the seams are *demonstrated* working (Bucket 5), not merely documented.
+
+Because sessions P1–P3 now run as unattended Devin Cloud sessions (see **Execution Model**
+below), frozen seams are no longer just a coordination convenience — they are the hard
+precondition for safe cloud execution. A Devin session that hits an ambiguous interface halts
+and surfaces the question; it never invents a shape.
 
 Everything off that path — per-session task clarity (→ `WORKSTREAMS.md`) and demo-path
 hardening (→ the late buckets) — is downstream of frozen seams, not a substitute for them.
@@ -27,9 +39,10 @@ hardening (→ the late buckets) — is downstream of frozen seams, not a substi
 
 ## User
 
-Four parallel sessions against this repo — three Devin Cloud sessions (P1, P2, P3), one
-dedicated Devin session for the foundation (Buckets 2–4), and one human Claude Code session
-(P4). What each session needs from this spec:
+Five sessions total — three Devin Cloud sessions (P1, P2, P3), one dedicated Devin session for
+the foundation (Buckets 2–4), and one human Claude Code session (P4). **Devin executes; humans
+review via Devin Review.** "Devin Review" is the interface a human reviews through — it is not
+Devin reviewing itself. What each session needs from this spec:
 
 - **Devin session — Foundation (Buckets 2–4).** Frozen contracts + fixtures, `scanForSecrets`,
   runtime skeleton. Reads `SPEC.md` in full; hard-stop per bucket with human review before the
@@ -55,12 +68,97 @@ dedicated Devin session for the foundation (Buckets 2–4), and one human Claude
   category that benefits from direct human taste.**
 
 All Devin sessions follow: **hard-stop per bucket** (complete one bucket, post diff, halt until
-human approves + merges, then proceed); **halt-on-ambiguity** (if a contract appears
-underspecified or needs changing, stop and surface the question — never guess or invent an
-interface); **stay-in-lane** (touch only your session's owned files, never edit
+human approves + merges via Devin Review, then proceed); **halt-on-ambiguity** (if a contract
+appears underspecified or needs changing, stop and surface the question — never guess or invent
+an interface); **stay-in-lane** (touch only your session's owned files, never edit
 `contracts.py` / `types.ts` or another session's files). Per-session file ownership, mock
 strategies, the blocking timeline (as checkpoints, not deadlines), and suggested task order
 live in `WORKSTREAMS.md`.
+
+---
+
+## Execution Model
+
+This section is the contract for *how* the build runs. It does not reopen any byte-level
+shape in AC-1…AC-8.
+
+### Roles
+
+| Who | Surface | Does what | Draws ACUs? |
+|---|---|---|---|
+| **Devin** (Foundation + P1 + P2 + P3) | Devin Cloud | **Executes** — writes the code for Buckets 2–4 and streams P1–P3, one bucket at a time; subagents permitted *within* a bucket | **Yes** (~266 pool) |
+| **Humans** | Devin Review + Claude Code | **Review** every Devin bucket (approve + merge before the next begins); **witness Bucket 5** live; **build P4** (Claude Code); own the **carve-outs** | No |
+
+**"Devin Review" is the interface a human reviews through — not Devin reviewing itself.**
+
+### Bucket-approval protocol (all Devin sessions)
+
+1. **Hard-stop per bucket.** A Devin session completes exactly one bucket (subagents are
+   permitted *within* the bucket), posts its diff, and **does not begin the next bucket until
+   a human approves and merges via Devin Review.**
+2. **Halt-on-ambiguity.** If a bucket is underspecified, or a frozen contract appears to need
+   changing, the session stops and surfaces the question. It never guesses or invents an
+   interface.
+3. **Stay-in-lane.** A session touches only its own stream's owned files. It never edits
+   `contracts.py` / `types.ts` or another stream's files.
+4. **No account / publish credentials.** Agentverse registration, the ASI:One shared-chat URL,
+   and the demo video are human-owned tasks that require account credentials. A Devin session
+   must never be handed these credentials and must never attempt those tasks.
+5. **ACU-awareness.** Each session has a soft-cap budget (see ACU allocation below). At ~80%
+   of its allocation, surface a burn alert and await human approval before drawing from the
+   shared reserve.
+
+### ACU allocation (~$600 / ~266-ACU pool; $2.25/ACU, ~15 min active compute/ACU)
+
+| Stream | Share | ACUs | Soft-cap alert |
+|---|---|---|---|
+| P3 — Linking + Orchestrator (heaviest, most-judged) | 38% | 101 | ~81 |
+| P2 — Extraction & writing | 21% | 56 | ~45 |
+| P1 — Ingestion (front-loaded, stable) | 17% | 45 | ~36 |
+| Foundation — Buckets 2–4 (contracts, secrets, skeleton) | 7% | ~19 | ~15 |
+| Shared reserve (tail / re-runs / integration) | 17% | 45 | human-approved draw only |
+| **P4 — Web app** | — | **0** | n/a (human) |
+
+Governance: soft cap = the stream's allocation; at ~80% the human reviewer is alerted
+(burn-monitoring); continuing past it requires **human approval to draw from the reserve** (no
+stream silently starves another); a session that would exceed even the reserve is **paused at
+its next Devin Review boundary**, where the owner may finish that bucket by hand. P4 consumes
+**no** ACUs (human Claude Code session). The binding risk is the *tail* — a runaway/looping
+session or repeated re-runs, amplified by in-bucket subagents burning concurrently — not the
+average; the caps target the tail.
+
+### P4 is entirely human-driven — no Devin session
+
+No Devin Cloud session is created for graph visualization, the five display states,
+staging/confirm editing, the Auto/Review-mode UI, or the handoff prompts. This is
+**deliberate** (Best UI/UX is a judged general-prize category that benefits from direct human
+taste), not a budget-driven cut.
+
+### Bucket-5 gate triggers all P1–P3 sessions
+
+**Bucket 5 (Devin-wired, human-witnessed live fire) is the single gate that triggers all three
+P1–P3 Devin sessions.** Sessions are triggered by this gate, not by a clock hour. Passing it
+establishes the **contract-conformance gate** — two deterministic checks:
+
+1. **`contracts.py` ↔ `types.ts` field parity** — every field name and type in the Python
+   `BaseModel`s matches its TypeScript counterpart exactly.
+2. **Every fixture node parses against AC-1** — all nodes in `fixtures/vault/` parse without
+   error against the AC-1 frontmatter schema.
+
+These two checks are run before Bucket 5's live fire (as part of the foundation verification)
+and are **re-applied to each P1–P3 Devin diff at that stream's Devin Review boundary** — so
+every Devin-built component is continuously verified against the frozen contracts as its bucket
+lands.
+
+### AC-1…AC-8 are byte-unchanged, and why
+
+None of the byte-level contracts — node schema (AC-1), vault layout + file formats (AC-2),
+agent message contracts (AC-3), failure visibility (AC-4), `scanForSecrets` (AC-5), hook
+configs (AC-6), display states (AC-7), ASI:One intents (AC-8) — nor the Stack non-negotiables
+(Redis, Fetch.AI, Arize, Claude Code + Codex hooks) are touched by this execution-model pivot.
+They are unchanged because they are the precondition that makes unattended Devin execution
+safe: a Devin session that hits an ambiguous or missing interface halts; it does not guess.
+The pivot changes *who executes and how work is reviewed*, never *what gets built*.
 
 ---
 
@@ -510,7 +608,7 @@ the project-wide standing rules that apply regardless of who's working — at mi
 
 ## Out of Scope
 
-- **Stretch handoff targets:** Devin REST-API integration.
+- **Stretch handoff targets:** Devin REST-API integration (already dropped; stays out).
 - **Dynamic `VaultIndex.md`** (BFS "most-relevant-now" traversal) — the static map ships; the
   dynamic variant is stretch only.
 - **Vector-search depth/tuning** beyond basic Redis vector retrieval — the Connector ships on
@@ -523,6 +621,19 @@ the project-wide standing rules that apply regardless of who's working — at mi
   spec locks the I/O contract, not the wording.
 - **Building the four streams themselves** — these buckets deliver the shared foundation + docs;
   the streams are the sessions' work, guided by `WORKSTREAMS.md`.
+- **Re-deciding the Karpathy bucket method or the product architecture.**
+
+**Out-of-band flags for the proposal owner (not fixed here — proposal PDF only):**
+1. **Residual P4-in-Devin language** in the proposal: the stream table lists P4 with a "Devin
+   session scope" column, and the prose says "P2 and P4 similarly start immediately." This
+   contradicts the locked "P4 never Devin" decision. Fix is in the proposal PDF/Google Doc, not
+   in these three files.
+2. **Arize call-site wording:** the proposal (Agent Architecture / Why This Wins) calls the
+   Connector's link-relevance an "LLM call site." `SPEC.md` ships the Connector heuristic-first
+   (vector as the release valve), so it is not an LLM call; the evaluator (AC-4b) scores the
+   Connector's *output*. The proposal wording should say the evaluator *judges* link relevance,
+   not that the Connector is an LLM. Resolved on the spec side (see AC-4b "Connector is judged,
+   not assumed-LLM" note); flagged for the proposal owner to align the PDF.
 
 ---
 
@@ -574,9 +685,12 @@ the project-wide standing rules that apply regardless of who's working — at mi
 
 These five buckets establish the shared foundation before the four streams begin. Bucket 1
 (this doc set) is already done. **Buckets 2–4 are executed by a dedicated Devin session** —
-same hard-stop-per-bucket rules as P1–P3, human review required before each next bucket begins.
-**Bucket 5 is Devin-wired but human-witnessed** — the full team observes the live fire together,
-and passing it is the single gate that triggers the P1–P3 Devin sessions. The four streams
+same hard-stop-per-bucket rules as P1–P3 (see Execution Model above), human review required
+before each next bucket begins. **Bucket 5 is Devin-wired but human-witnessed** — the full
+team observes the live fire together; **passing it is the single gate that triggers the P1–P3
+Devin sessions** (sessions are triggered by this gate, not by a clock hour). Bucket 5 also
+establishes the **contract-conformance gate** (two deterministic checks below) that is then
+re-applied to each P1–P3 Devin diff at that stream's Devin Review boundary. The four streams
 follow afterward, per `WORKSTREAMS.md`.
 
 - **Bucket 1 — Project docs.** `WORKSTREAMS.md` + `CLAUDE.md`, and commit `SPEC.md` alongside.
@@ -622,6 +736,19 @@ follow afterward, per `WORKSTREAMS.md`.
 - **Bucket 5 — Walking skeleton (seam proof).** Stubs wired end-to-end so the seams are
   *demonstrated* parallel-safe before any owner commits real hours.
 
+  **Pre-flight (run before the live fire — the contract-conformance gate):**
+  1. **`contracts.py` ↔ `types.ts` field parity:** run the parity check script to confirm
+     every field name and type in `vaultmind/contracts.py` (Pydantic v2) matches its
+     TypeScript counterpart in `webapp/types.ts` exactly.
+  2. **Fixture vault parses against AC-1:** run the fixture-parse script to confirm every
+     node under `fixtures/vault/nodes/` parses without error against the AC-1 frontmatter
+     schema.
+
+  Both checks must pass (exit 0, zero errors) before proceeding to the live fire. They are
+  then **re-applied to each P1–P3 Devin diff at that stream's Devin Review boundary**, so
+  every Devin-built component is continuously verified against the frozen contracts as its
+  bucket lands.
+
   **Definition of done (the gate — observed live, together, in one sitting):** with
   `npm run vaultmind:start` running, the fixture transcript is fed in (real `Stop` hook against
   a fixture session, or the producer replaying it), and the team watches **all of the following
@@ -641,6 +768,10 @@ follow afterward, per `WORKSTREAMS.md`.
 
   **Explicitly not required here:** real Scribe/Connector logic, the real graph UI, vector
   search, Agentverse publish — those are stream work. Each owner replaces their stub.
+
+  **Passing Bucket 5 triggers all three P1–P3 Devin sessions.** The team confirms together
+  (live, in one sitting) that both pre-flight checks passed and all seven live-fire steps fired
+  cleanly. That confirmation is the signal; no session starts before it.
 
   Why interpretation-1 (live fire), not independent shape-checks: independent shape confirmation
   cannot catch a wiring bug (e.g., a misconfigured SSE subscription) — it goes green while real
