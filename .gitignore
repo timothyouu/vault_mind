@@ -32,3 +32,6 @@ webapp/venv/
 
 # VaultMind cursors (per-session bookmark files)
 .vaultmind/cursors/
+
+# Git worktrees
+.worktrees/
