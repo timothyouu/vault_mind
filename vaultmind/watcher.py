@@ -577,6 +577,8 @@ def run_watcher(vault_root: pathlib.Path) -> None:
     r = _redis_factory()
     _ensure_consumer_group(r)
 
+    # Consumer name includes PID so multiple watcher processes don't share a
+    # consumer slot; P1 may adjust this convention to watcher-<pid>.
     consumer = f"watcher-{os.getpid()}"
     logger.info(
         "Watcher started — consumer=%s, vault=%s",
@@ -584,21 +586,25 @@ def run_watcher(vault_root: pathlib.Path) -> None:
         vault_root,
     )
 
+    # Reclaim any stuck PEL messages left by a previous crashed process.
     _reclaim_pending(r, consumer, vault_root, tracer)
 
     _reclaim_counter = 0
     while True:
+        # Periodically re-check PEL for items that became idle after startup
+        # (e.g., a peer consumer that crashed while we were running).
         _reclaim_counter += 1
-        if _reclaim_counter % 150 == 0:
+        if _reclaim_counter % 150 == 0:  # ~every 5 minutes at 2 s/iteration
             _reclaim_pending(r, consumer, vault_root, tracer)
 
+        # Read the next message (block up to 2 s for new arrivals).
         try:
             messages = r.xreadgroup(
                 GROUP_NAME,
                 consumer,
                 {STREAM_TURNS: ">"},
                 count=1,
-                block=2000,
+                block=2000,  # 2 s
             )
         except Exception as exc:
             logger.error("XREADGROUP error: %s — sleeping 1 s", exc, exc_info=True)
@@ -606,6 +612,7 @@ def run_watcher(vault_root: pathlib.Path) -> None:
             continue
 
         if not messages:
+            # No new messages within the block window; loop again.
             continue
 
         for _stream_name, entries in messages:

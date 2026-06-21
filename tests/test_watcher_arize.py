@@ -60,12 +60,16 @@ def test_stage_span_constants_exist():
 # ---------------------------------------------------------------------------
 
 def test_init_arize_called_at_startup(tmp_path, monkeypatch):
-    """run_watcher calls init_arize(SERVICE_PIPELINE) before the main loop."""
+    """run_watcher calls init_arize(SERVICE_PIPELINE) and get_tracer(SERVICE_PIPELINE) before Redis."""
+    from opentelemetry import trace as otel_trace_module
     from vaultmind.watcher import run_watcher
     from vaultmind.arize_init import SERVICE_PIPELINE
 
     mock_init = MagicMock(return_value=None)
     monkeypatch.setattr("vaultmind.watcher.init_arize", mock_init)
+
+    mock_get_tracer = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(otel_trace_module, "get_tracer", mock_get_tracer)
 
     # Make the Redis factory raise immediately so the loop never runs.
     def _boom():
@@ -76,3 +80,4 @@ def test_init_arize_called_at_startup(tmp_path, monkeypatch):
         run_watcher(tmp_path / "vault")
 
     mock_init.assert_called_once_with(SERVICE_PIPELINE)
+    mock_get_tracer.assert_called_once_with(SERVICE_PIPELINE)
