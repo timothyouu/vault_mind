@@ -505,7 +505,13 @@ def _process_message(
         # cannot trigger 'failed' progress or prevent ACK.
         # run_eval catches all its own exceptions; this is belt-and-suspenders.
         if nodes_written and link_results and scribe_result is not None:
-            pass  # Task 4 fills this in
+            agg_lr = LinkResult(
+                id=turn_id,
+                related=[link for lr in link_results for link in lr.related],
+                status=link_results[0].status,
+                linked_at=link_results[-1].linked_at,
+            )
+            run_eval(qi, scribe_result, agg_lr, vault_root, _tracer)
 
 
 # ---------------------------------------------------------------------------

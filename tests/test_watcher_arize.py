@@ -136,3 +136,122 @@ def test_stage_spans_are_children_of_turn(tmp_path):
         assert stage_span.parent is not None
         assert stage_span.parent.span_id == turn_span.context.span_id, \
             f"{stage_name} is not a child of 'turn'"
+
+
+# ---------------------------------------------------------------------------
+# Task 4: run_eval wiring
+# ---------------------------------------------------------------------------
+
+def test_run_eval_called_once_per_turn(tmp_path, monkeypatch):
+    """run_eval fires exactly once per turn regardless of how many nodes were extracted."""
+    from vaultmind.watcher import _process_message
+
+    mock_eval = MagicMock(return_value={"pipeline_quality": 0.9})
+    monkeypatch.setattr("vaultmind.watcher.run_eval", mock_eval)
+
+    r = _make_redis(tmp_path)
+    _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path))
+
+    assert mock_eval.call_count == 1
+
+
+def test_run_eval_skipped_when_no_extractions(tmp_path, monkeypatch):
+    """run_eval is not called when the Scribe produces zero extractions."""
+    from vaultmind.watcher import _process_message
+
+    mock_eval = MagicMock()
+    monkeypatch.setattr("vaultmind.watcher.run_eval", mock_eval)
+    monkeypatch.setattr(
+        "vaultmind.watcher.SCRIBE_FN",
+        lambda qi: ScribeResult(
+            turn_id=qi.turn_id,
+            source_tool=qi.source_tool,
+            source_session=qi.session_id,
+            extractions=[],
+            intent_shift=None,
+        ),
+    )
+
+    r = _make_redis(tmp_path)
+    _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path))
+
+    mock_eval.assert_not_called()
+
+
+def test_run_eval_aggregates_related_links_across_nodes(tmp_path, monkeypatch):
+    """Multi-node turn: eval receives the union of all nodes' related links."""
+    from vaultmind.watcher import _process_message
+
+    # Two extractions → two nodes → two LinkResults with different related links.
+    two_extraction_scribe = ScribeResult(
+        turn_id="sess-001-abc",
+        source_tool=SourceTool.claude_code,
+        source_session="sess-001",
+        extractions=[
+            Extraction(type=NodeType.decision, title="Use Redis", slug="use-redis",
+                       body="Decided to use Redis."),
+            Extraction(type=NodeType.constraint, title="Max 100 keys", slug="max-100-keys",
+                       body="Hard limit: 100 keys per session."),
+        ],
+        intent_shift=None,
+    )
+
+    node_a = NodeWritten(
+        id="node-a", path="vault/nodes/node-a.md",
+        type=NodeType.decision, title="Use Redis",
+        status=NodeStatus.approved, flags=[], intent_ref="2026-06-21 14:32",
+    )
+    node_b = NodeWritten(
+        id="node-b", path="vault/nodes/node-b.md",
+        type=NodeType.constraint, title="Max 100 keys",
+        status=NodeStatus.approved, flags=[], intent_ref="2026-06-21 14:32",
+    )
+    lr_a = LinkResult(id="node-a", related=["[[Constraints]]"], status=NodeStatus.approved,
+                      linked_at="2026-06-21T14:32:09Z")
+    lr_b = LinkResult(id="node-b", related=["[[TechStack]]"], status=NodeStatus.approved,
+                      linked_at="2026-06-21T14:32:10Z")
+
+    monkeypatch.setattr("vaultmind.watcher.SCRIBE_FN", lambda qi: two_extraction_scribe)
+    monkeypatch.setattr("vaultmind.watcher.NOTE_CREATOR_FN",
+                        lambda sr, vault_root: [node_a, node_b])
+    monkeypatch.setattr(
+        "vaultmind.watcher.CONNECTOR_FN",
+        lambda nw, r, vault_root: lr_a if nw.id == "node-a" else lr_b,
+    )
+
+    captured = {}
+    def _capture_eval(qi, sr, agg_lr, vault_root, tracer=None):
+        captured["agg_lr"] = agg_lr
+        return {"pipeline_quality": 0.9}
+
+    monkeypatch.setattr("vaultmind.watcher.run_eval", _capture_eval)
+
+    r = _make_redis(tmp_path)
+    _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path))
+
+    assert "[[Constraints]]" in captured["agg_lr"].related
+    assert "[[TechStack]]" in captured["agg_lr"].related
+    assert len(captured["agg_lr"].related) == 2
+
+
+def test_done_stage_set_before_run_eval(tmp_path, monkeypatch):
+    """ACK and done-stage are recorded before run_eval runs (run_eval cannot block them)."""
+    from vaultmind.watcher import _process_message
+
+    # Monkeypatch run_eval to raise — simulates a bug in the eval path.
+    monkeypatch.setattr(
+        "vaultmind.watcher.run_eval",
+        MagicMock(side_effect=RuntimeError("eval exploded")),
+    )
+
+    r = _make_redis(tmp_path)
+
+    # _process_message will raise because run_eval raises outside the try block.
+    # We catch it and verify the turn was already marked done.
+    try:
+        _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path))
+    except RuntimeError:
+        pass
+
+    stage = r.hget("vaultmind:turn:sess-001-abc", "stage")
+    assert stage == TurnStage.done.value
