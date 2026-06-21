@@ -1,36 +1,90 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { NodeChangedEvent } from "../../types";
 import type { VaultNode } from "./api/nodes/route";
 
 // ---------------------------------------------------------------------------
-// Icons
+// Shared nav (matches graph, setup, intent pages)
 // ---------------------------------------------------------------------------
 
-function SunIcon() {
+function VaultNav({ theme, onToggle, connected }: {
+  theme: "dark" | "light";
+  onToggle: () => void;
+  connected: boolean;
+}) {
+  const path = usePathname();
+  const links = [
+    { href: "/setup", label: "Setup" },
+    { href: "/graph", label: "Graph" },
+    { href: "/intent", label: "Intent log" },
+    { href: "/merge", label: "Merge" },
+  ];
   return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
-      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function MergeIcon() {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-      <path d="M6 3v12M18 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6 15a9 9 0 0 0 9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
+    <header style={{
+      flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+      height: 56, padding: "0 20px",
+      background: "var(--bg)", borderBottom: "1px solid var(--border)",
+      position: "sticky", top: 0, zIndex: 30,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 26, height: 26, borderRadius: 7,
+            background: "linear-gradient(135deg, var(--accent), #7d5bed)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)",
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l8 4.5v9L12 22l-8-6.5v-9L12 2z" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+              <circle cx="12" cy="11" r="2.4" fill="#fff" />
+            </svg>
+          </div>
+          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.2px" }}>VaultMind</span>
+        </div>
+        <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4 }}>
+          {links.map(({ href, label }) => {
+            const active = path === href || (path === "/" && href === "/intent");
+            return (
+              <Link key={href} href={href} style={{
+                padding: "6px 11px", borderRadius: 7, fontSize: 13, textDecoration: "none",
+                color: active ? "var(--text)" : "var(--muted)",
+                fontWeight: active ? 500 : 400,
+                background: active ? "var(--surface)" : "transparent",
+                border: active ? "1px solid var(--border)" : "1px solid transparent",
+              }}>{label}</Link>
+            );
+          })}
+        </nav>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 7, padding: "5px 11px",
+          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9999,
+          fontSize: 12, color: "var(--muted)",
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: connected ? "var(--green)" : "var(--red)",
+            animation: connected ? "vm-livedot 1.6s ease-in-out infinite" : "none",
+          }} />
+          {connected ? "Live · watching vault" : "Disconnected"}
+        </div>
+        <button onClick={onToggle} title="Toggle theme" style={{
+          width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+          color: "var(--muted)", cursor: "pointer",
+        }}>
+          {theme === "dark"
+            ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
+            : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          }
+        </button>
+      </div>
+    </header>
   );
 }
 
@@ -244,58 +298,17 @@ export default function VaultPage() {
 
   return (
     <div style={{
-      minHeight: "100vh",
+      minHeight: "100vh", display: "flex", flexDirection: "column",
       background: "var(--bg)",
       color: "var(--text)",
       fontFamily: "var(--font-geist-sans, system-ui, sans-serif)",
     }}>
-      {/* Top bar */}
-      <header style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "0 24px", height: 52,
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky", top: 0, zIndex: 10,
-      }}>
-        <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>
-          VaultMind
-        </span>
-        <span style={{
-          fontSize: 11, color: "var(--muted)",
-          fontFamily: "var(--font-jetbrains-mono, monospace)",
-          marginLeft: 2,
-        }}>vault</span>
+      <style>{`@keyframes vm-livedot { 0%, 100% { opacity: .35; } 50% { opacity: 1; } } @keyframes vm-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-        <div style={{ flex: 1 }} />
-
-        <StatusPill connected={connected} />
-
-        {([["Setup", "/setup"], ["Graph", "/graph"], ["Intent log", "/intent"], ["Merge", "/merge"]] as const).map(([label, href]) => (
-          <a key={label} href={href} style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            padding: "4px 10px", borderRadius: 6,
-            fontSize: 12, color: "var(--muted)",
-            background: "var(--inset)", border: "1px solid var(--border)",
-            textDecoration: "none", cursor: "pointer",
-          }}>{label}</a>
-        ))}
-
-        <button
-          onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")}
-          style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            width: 30, height: 30, borderRadius: 6,
-            background: "var(--inset)", border: "1px solid var(--border)",
-            color: "var(--muted)", cursor: "pointer",
-          }}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-        </button>
-      </header>
+      <VaultNav theme={theme} onToggle={() => setTheme(t => t === "dark" ? "light" : "dark")} connected={connected} />
 
       {/* Body: left = nodes, right = event feed */}
-      <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
 
         {/* Left: vault nodes */}
         <main style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>

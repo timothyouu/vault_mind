@@ -218,7 +218,7 @@ export default function IntentPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [mode, setMode] = useState<"auto" | "review">("auto");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [statusOverride, setStatusOverride] = useState<Record<string, "committed" | "discarded">>({});
+  const [statusOverride, setStatusOverride] = useState<Partial<Record<string, "committed" | "discarded">>>({});
   const [copied, setCopied] = useState(false);
   const [handoffSealed, setHandoffSealed] = useState(false);
 
