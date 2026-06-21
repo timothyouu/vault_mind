@@ -138,6 +138,9 @@ def _run_agent() -> None:
         )
         return
 
+    import asyncio
+    asyncio.set_event_loop(asyncio.new_event_loop())  # Python 3.10+: no auto loop in threads
+
     bridge = Agent(
         name="vaultmind-bridge",
         seed=BRIDGE_SEED,
