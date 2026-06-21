@@ -1,6 +1,6 @@
 # VaultMind
 
-Persistent, structured project memory in Obsidian-compatible Markdown — transferable between LLM tools (Claude Code, Codex, Gemini) without late-stage summarization.
+Persistent, structured project memory in Obsidian-compatible Markdown. All transferable between LLM tools (Claude Code, Codex, Gemini) without needing late-stage summarization.
 
 A multi-agent pipeline watches your Claude Code / Codex sessions and writes a git-native vault of decisions, constraints, goals, and questions as you work. A Next.js web app lets you review, approve, and hand off that vault to a receiving agent. A Fetch.AI Orchestrator uAgent sits on ASI:One so you can query project state or trigger handoff via natural language.
 
@@ -48,6 +48,8 @@ Claude Code / Codex hooks
    pip install -e .
    cd webapp && npm install && cd ..
    ```
+ 
+The `-e` flag installs the Python package in editable mode, so changes you make to the source are picked up immediately without reinstalling.
 
 2. **Set environment variables**
 
@@ -72,6 +74,8 @@ Claude Code / Codex hooks
    VAULTMIND_VAULT_ROOT=/path/to/vault   # defaults to <repo>/vault
    REPO_ROOT=/path/to/repo               # used by webapp conflict resolver
    ```
+   
+> `VAULTMIND_VAULT_ROOT` is useful if you want the vault to live outside the repo — for example, inside an Obsidian vault you already have open. The app will still track it the same way.
 
 3. **Start everything**
 
