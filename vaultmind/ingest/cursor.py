@@ -16,7 +16,7 @@ def load(session_id: str) -> str | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data.get("last_uuid")
-    except (OSError, json.JSONDecodeError, KeyError):
+    except (OSError, json.JSONDecodeError):
         return None
 
 
