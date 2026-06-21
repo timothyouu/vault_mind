@@ -1,4 +1,4 @@
-# VaultMind startup — starts all three required processes concurrently.
+# VaultMind startup - starts all three required processes concurrently.
 # Usage: npm run vaultmind:start  (Windows / PowerShell)
 # Requires: Docker Desktop, Python 3.11+, Node/npm
 
@@ -30,7 +30,7 @@ $existingWatcher = Get-WmiObject Win32_Process -Filter "name='python.exe'" |
     Select-Object -First 1
 $watcherOwned = $false
 if ($existingWatcher) {
-    Write-Host "      WARNING: watcher already running (PID $($existingWatcher.ProcessId)) for vault '$VaultRoot' — skipping." -ForegroundColor Yellow
+    Write-Host "      WARNING: watcher already running (PID $($existingWatcher.ProcessId)) for vault '$VaultRoot' - skipping." -ForegroundColor Yellow
     $watcher = Get-Process -Id $existingWatcher.ProcessId
 } else {
     $watcher = Start-Process $PythonExe -ArgumentList "-m vaultmind.watcher" -PassThru -NoNewWindow
