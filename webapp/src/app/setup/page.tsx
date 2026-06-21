@@ -29,7 +29,7 @@ function VaultNav({ theme, onToggle }: { theme: "dark" | "light"; onToggle: () =
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 26, height: 26, borderRadius: 7,
-            background: "linear-gradient(135deg, var(--accent), #7d5bed)",
+            background: "linear-gradient(135deg, var(--accent), var(--accent-btn))",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)",
           }}>
@@ -319,7 +319,7 @@ export default function SetupPage() {
               <div style={{
                 height: "100%",
                 width: `${Math.round((doneCount / STEPS.length) * 100)}%`,
-                background: "linear-gradient(90deg, var(--green), #56d364)",
+                background: "linear-gradient(90deg, var(--green), #5fe0a4)",
                 borderRadius: 9999,
                 transition: "width .45s cubic-bezier(.4,0,.2,1)",
               }} />
@@ -453,9 +453,9 @@ export default function SetupPage() {
             {STEPS.map((s, i) => {
               const isDone = !!done[s.id];
               const copyKey = `step-${s.id}`;
-              const amberColor = theme === "dark" ? "#d29922" : "#9a6700";
-              const accentColor = theme === "dark" ? "#388bfd" : "#0969da";
-              const greenColor = theme === "dark" ? "#3fb950" : "#1a7f37";
+              const amberColor = theme === "dark" ? "#dba53f" : "#9a6a10";
+              const accentColor = theme === "dark" ? "#5b8cff" : "#2f5fe0";
+              const greenColor = theme === "dark" ? "#46c98a" : "#0f8f63";
 
               return (
                 <div key={s.id} style={{

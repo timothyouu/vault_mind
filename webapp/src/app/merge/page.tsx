@@ -285,7 +285,7 @@ export default function MergePage() {
       <header style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, height: 56, padding: "0 20px", background: v("--bg"), borderBottom: `1px solid ${v("--border")}`, position: "sticky", top: 0, zIndex: 30 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, var(--accent), #7d5bed)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)" }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, var(--accent), var(--accent-btn))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)" }}>
               <VaultIcon />
             </div>
             <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-.2px" }}>VaultMind</span>
@@ -324,7 +324,7 @@ export default function MergePage() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-                  <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-.2px" }}>{fileData.displayName}</h1>
+                  <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, fontFamily: "var(--font-space-grotesk), monospace", letterSpacing: "-.2px" }}>{fileData.displayName}</h1>
                   <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: v("--amber-dim"), color: v("--amber"), border: "1px solid color-mix(in srgb, var(--amber) 40%, transparent)" }}>
                     conflicting edits
                   </span>
@@ -348,7 +348,7 @@ export default function MergePage() {
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 12, color: v("--muted") }}>{resolvedCount} of {totalHunks} resolved</div>
                 <div style={{ marginTop: 5, width: 150, height: 6, borderRadius: 999, background: v("--inset"), overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: resolvedPct, background: "linear-gradient(90deg, var(--green), #56d364)", borderRadius: 999, transition: "width .35s" }} />
+                  <div style={{ height: "100%", width: resolvedPct, background: "linear-gradient(90deg, var(--green), #5fe0a4)", borderRadius: 999, transition: "width .35s" }} />
                 </div>
               </div>
               <button
@@ -380,7 +380,7 @@ export default function MergePage() {
               <span style={{ width: 11, height: 11, borderRadius: 3, background: "var(--purple-line)", border: "1px solid color-mix(in srgb, var(--purple) 55%, transparent)", display: "inline-block" }} />
               Incoming — {fileData.sessionLabel} (disk)
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: v("--muted"), marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: v("--muted"), marginLeft: "auto", fontFamily: "var(--font-space-grotesk), monospace" }}>
               base {fileData.baseRef} · HEAD {fileData.headRef}
             </div>
           </div>
@@ -390,7 +390,7 @@ export default function MergePage() {
 
             {/* DIFF */}
             <section style={{ minWidth: 0, overflowY: "auto", background: v("--inset") }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, lineHeight: 1.7 }}>
+              <div style={{ fontFamily: "var(--font-space-grotesk), monospace", fontSize: 12.5, lineHeight: 1.7 }}>
                 {fileData.segments.map((seg, si) => {
                   if (seg.type === "context") {
                     return (
@@ -550,7 +550,7 @@ export default function MergePage() {
                   </div>
                   <div style={{ fontSize: 12, color: v("--text"), lineHeight: 1.55 }}>{scan.message}</div>
                   {scan.snippet && (
-                    <div style={{ marginTop: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--red)", background: v("--inset"), border: "1px solid color-mix(in srgb, var(--red) 30%, transparent)", borderRadius: 6, padding: "7px 9px" }}>
+                    <div style={{ marginTop: 8, fontFamily: "var(--font-space-grotesk), monospace", fontSize: 11, color: "var(--red)", background: v("--inset"), border: "1px solid color-mix(in srgb, var(--red) 30%, transparent)", borderRadius: 6, padding: "7px 9px" }}>
                       {scan.snippet}
                     </div>
                   )}
@@ -595,7 +595,7 @@ export default function MergePage() {
           <div style={{ fontSize: 13.5, color: v("--muted"), maxWidth: "38ch", lineHeight: 1.6, margin: "0 auto" }}>
             All sessions are in sync. VaultMind will surface conflicts here as soon as it detects divergent edits.
           </div>
-          <div style={{ marginTop: 28, display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 16px", background: v("--surface"), border: `1px solid ${v("--border")}`, borderRadius: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: v("--muted") }}>
+          <div style={{ marginTop: 28, display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 16px", background: v("--surface"), border: `1px solid ${v("--border")}`, borderRadius: 10, fontFamily: "var(--font-space-grotesk), monospace", fontSize: 12, color: v("--muted") }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)", boxShadow: "0 0 0 3px var(--green-dim)", flex: "none", display: "inline-block" }} />
             monitoring · vault/nodes/ · no conflicts
           </div>
@@ -611,11 +611,11 @@ export default function MergePage() {
 
       {/* TOAST */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 60, display: "flex", alignItems: "center", gap: 9, background: "rgba(13,17,23,.97)", border: `1px solid ${toastBorder}`, borderRadius: 10, padding: "11px 15px", boxShadow: "0 10px 30px rgba(1,4,9,.6)", animation: "vm-toast .25s both" }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 60, display: "flex", alignItems: "center", gap: 9, background: "rgba(13,15,19,.97)", border: `1px solid ${toastBorder}`, borderRadius: 10, padding: "11px 15px", boxShadow: "0 10px 30px rgba(8,9,14,.6)", animation: "vm-toast .25s both" }}>
           <span style={{ display: "inline-flex", color: toastColor }}>
             {toast.kind === "bad" ? <AlertIcon color={toastColor} /> : toast.kind === "info" ? <InfoIcon color={toastColor} /> : <CheckIcon color={toastColor} />}
           </span>
-          <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "'JetBrains Mono', monospace" }}>{toast.msg}</span>
+          <span style={{ fontSize: 13, color: "#e9eaec", fontFamily: "var(--font-space-grotesk), monospace" }}>{toast.msg}</span>
         </div>
       )}
     </div>

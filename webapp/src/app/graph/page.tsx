@@ -31,7 +31,7 @@ function VaultNav({ theme, onToggle, liveCount }: {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 26, height: 26, borderRadius: 7,
-            background: "linear-gradient(135deg, var(--accent), #7d5bed)",
+            background: "linear-gradient(135deg, var(--accent), var(--accent-btn))",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)",
           }}>
@@ -114,12 +114,12 @@ function rng(seed: number) {
 function buildGraph() {
   const rand = rng(20260620);
   const groups: GGroup[] = [
-    { id: "auth",   label: "auth/",         color: "#4c8dff", desc: "Identity, sessions and key rotation." },
-    { id: "pay",    label: "payments/",     color: "#e3934d", desc: "Billing, ledger and payouts." },
-    { id: "engine", label: "graph-engine/", color: "#57ab5a", desc: "Indexing, diffing and the secret scanner." },
-    { id: "ui",     label: "ui/",           color: "#db61a2", desc: "Canvas, panels and the editor surface." },
-    { id: "docs",   label: "docs/",         color: "#8b949e", desc: "Specs, ADRs and onboarding." },
-    { id: "tests",  label: "tests/",        color: "#a371f7", desc: "Unit and end-to-end coverage." },
+    { id: "auth",   label: "auth/",         color: "#5b8cff", desc: "Identity, sessions and key rotation." },
+    { id: "pay",    label: "payments/",     color: "#dba53f", desc: "Billing, ledger and payouts." },
+    { id: "engine", label: "graph-engine/", color: "#46c98a", desc: "Indexing, diffing and the secret scanner." },
+    { id: "ui",     label: "ui/",           color: "#e07ca6", desc: "Canvas, panels and the editor surface." },
+    { id: "docs",   label: "docs/",         color: "#8a9099", desc: "Specs, ADRs and onboarding." },
+    { id: "tests",  label: "tests/",        color: "#3cc6cf", desc: "Unit and end-to-end coverage." },
   ];
   const pools: Record<string, string[]> = {
     auth:   ["oauth-callback.ts","session-store.ts","rotate-keys.ts","jwt-verify.ts","login-flow.md","sso-saml.ts","mfa-totp.ts","token-cache.ts","rbac-policy.ts","password-reset.ts","device-trust.ts"],
@@ -140,7 +140,7 @@ function buildGraph() {
 
   const add = (n: GNode) => { nodes.push(n); byId[n.id] = n; return n; };
 
-  add({ id: "center", label: "trust-graph-v1", group: "intent", groupColor: "#9aa4b2",
+  add({ id: "center", label: "trust-graph-v1", group: "intent", groupColor: "#9aa0a8",
     status: "pending", cx: cx0, cy: cy0, r: 24, isCenter: true, isHub: true,
     type: "intent", created: "session start", intentRef: "—", orphan: false, deg: 0 });
 
@@ -194,7 +194,7 @@ function buildGraph() {
   const orphanNames = ["scratch-2026-06-18.md","tmp-export.json","untitled.md","clipboard.md","draft-notes.md","wip.ts"];
   orphanNames.forEach((nm, i) => {
     const a = rand() * Math.PI * 2, d = 300 + rand() * 70;
-    add({ id: "orphan:" + nm, label: nm, group: "docs", groupColor: "#6e7681", status: "clean",
+    add({ id: "orphan:" + nm, label: nm, group: "docs", groupColor: "#6b7079", status: "clean",
       cx: Math.max(46, Math.min(954, cx0 + Math.cos(a) * d)),
       cy: Math.max(48, Math.min(712, cy0 + Math.sin(a) * d * 0.78)),
       r: 0, type: "note", created: created[i % created.length], intentRef: "—", orphan: true, isHub: false, deg: 0 });
@@ -226,9 +226,9 @@ const G = buildGraph();
 // ---------------------------------------------------------------------------
 
 const STATUS = {
-  clean:   { label: "Clean",   dot: "#3fb950", glow: "rgba(63,185,80,.18)",   color: "#3fb950", why: "Committed — matches git HEAD." },
-  pending: { label: "Pending", dot: "#d29922", glow: "rgba(210,153,34,.2)",   color: "#d29922", why: "Modified — not yet committed." },
-  blocked: { label: "Blocked", dot: "#f85149", glow: "rgba(248,81,73,.22)",   color: "#f85149", why: "scanForSecrets flagged a secret." },
+  clean:   { label: "Clean",   dot: "#46c98a", glow: "rgba(70,201,138,.18)",   color: "#46c98a", why: "Committed — matches git HEAD." },
+  pending: { label: "Pending", dot: "#dba53f", glow: "rgba(219,165,63,.2)",   color: "#dba53f", why: "Modified — not yet committed." },
+  blocked: { label: "Blocked", dot: "#f26d78", glow: "rgba(242,109,120,.22)",   color: "#f26d78", why: "scanForSecrets flagged a secret." },
 };
 
 // ---------------------------------------------------------------------------
@@ -467,14 +467,14 @@ export default function GraphPage() {
         {/* CANVAS */}
         <div style={{
           position: "relative", flex: 1, minWidth: 0,
-          background: "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)",
+          background: "var(--bg)",
           overflow: "hidden",
         }}>
           {/* Top-left toolbar */}
           <div style={{ position: "absolute", top: 14, left: 16, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: "var(--inset)", backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px",
             }}>
               <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--muted)" }}>
@@ -486,7 +486,7 @@ export default function GraphPage() {
                 onClick={() => { setSelectedId(null); setActiveGroup(null); setActiveStatus(null); setQuery(""); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+                  background: "var(--inset)", backdropFilter: "blur(6px)",
                   border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px",
                   color: "var(--text)", fontSize: 12, fontWeight: 500, cursor: "pointer",
                 }}
@@ -515,7 +515,7 @@ export default function GraphPage() {
             )}
             <Link href="/merge" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: "var(--inset)", backdropFilter: "blur(6px)",
               border: "1px solid color-mix(in srgb, var(--amber) 45%, var(--border))",
               borderRadius: 8, padding: "7px 12px", color: "var(--amber)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
             }}>
@@ -524,7 +524,7 @@ export default function GraphPage() {
             </Link>
             <Link href="/intent" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: "var(--inset)", backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "7px 12px",
               color: "var(--text)", fontSize: 12.5, fontWeight: 500, cursor: "pointer", textDecoration: "none",
             }}>
@@ -552,7 +552,7 @@ export default function GraphPage() {
                 return (
                   <line key={i}
                     x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy}
-                    stroke={strong ? "#b0bac6" : (e.cross ? "#4e5c72" : "#3d4f63")}
+                    stroke={strong ? "#b3b8bf" : (e.cross ? "#565b63" : "#3a3e44")}
                     strokeWidth={e.spoke ? 2 : (strong ? 1.8 : 1.3)}
                     opacity={activeSet ? (on ? (strong ? 0.9 : 0.55) : 0.06) : (e.spoke ? 0.48 : 0.34)}
                     style={{ transition: "opacity .25s" }}
@@ -565,12 +565,12 @@ export default function GraphPage() {
                 const st = effStatus(n);
                 const sel = n.id === selectedId;
                 let fill = n.groupColor;
-                let stroke = "#0b0f16", strokeW = 1;
-                if (st === "blocked") { fill = "#f85149"; stroke = "#b5232b"; strokeW = 1.5; }
-                else if (st === "pending") { stroke = "#d29922"; strokeW = 2; }
-                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#d29922" : (st === "blocked" ? "#b5232b" : "rgba(255,255,255,.22)"); }
-                if (n.isCenter) { fill = "#6e7681"; stroke = "rgba(255,255,255,.28)"; strokeW = 2; }
-                if (sel) { stroke = "#ffffff"; strokeW = 2.6; }
+                let stroke = "var(--bg)", strokeW = 1;
+                if (st === "blocked") { fill = "#f26d78"; stroke = "#c2414b"; strokeW = 1.5; }
+                else if (st === "pending") { stroke = "#dba53f"; strokeW = 2; }
+                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#dba53f" : (st === "blocked" ? "#c2414b" : "var(--border)"); }
+                if (n.isCenter) { fill = "var(--faint)"; stroke = "var(--border)"; strokeW = 2; }
+                if (sel) { stroke = "var(--accent)"; strokeW = 2.6; }
                 const showLabel = n.isCenter || (n.isHub && (!activeSet || isActive(n.id))) || sel || n.id === hoverId;
                 return (
                   <g key={n.id}
@@ -580,14 +580,14 @@ export default function GraphPage() {
                     style={{ cursor: "pointer", opacity: isActive(n.id) ? 1 : 0.14, transition: "opacity .25s" }}
                   >
                     {st === "blocked" && (
-                      <circle cx={n.cx} cy={n.cy} r={n.r + 5} fill="none" stroke="#f85149" strokeWidth="1.5"
+                      <circle cx={n.cx} cy={n.cy} r={n.r + 5} fill="none" stroke="#f26d78" strokeWidth="1.5"
                         style={{ transformOrigin: `${n.cx}px ${n.cy}px`, animation: "vm-ring 2.2s ease-out infinite" }} />
                     )}
                     <circle cx={n.cx} cy={n.cy} r={n.r} fill={fill} stroke={stroke} strokeWidth={strokeW} />
                     {showLabel && (
                       <text x={n.cx} y={n.cy - n.r - 7} textAnchor="middle"
-                        fontSize={n.isCenter ? 14 : 11} fill="#c9d1d9"
-                        stroke="#010409" strokeWidth="3" paintOrder="stroke"
+                        fontSize={n.isCenter ? 14 : 11} fill="var(--text)"
+                        stroke="var(--bg)" strokeWidth="3" paintOrder="stroke"
                         style={{ fontFamily: "-apple-system, sans-serif", fontWeight: 500, pointerEvents: "none", letterSpacing: ".2px" }}>
                         {n.label}
                       </text>
@@ -609,15 +609,15 @@ export default function GraphPage() {
               <div style={{
                 position: "fixed", left: tipPos.x, top: tipPos.y, zIndex: 50,
                 pointerEvents: "none", transform: "translate(-50%, calc(-100% - 12px))",
-                background: "rgba(13,17,23,.96)", border: "1px solid var(--border)",
-                borderRadius: 9, padding: "9px 11px", boxShadow: "0 8px 24px rgba(1,4,9,.6)",
+                background: "var(--inset)", border: "1px solid var(--border)",
+                borderRadius: 9, padding: "9px 11px", boxShadow: "0 8px 24px rgba(0,0,0,.35)",
                 minWidth: 160, maxWidth: 230,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: stDef.dot, boxShadow: `0 0 0 3px ${stDef.glow}` }} />
-                  <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12.5, color: "#e6edf3", fontWeight: 500 }}>{n.label}</span>
+                  <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12.5, color: "#e9eaec", fontWeight: 500 }}>{n.label}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: "#7d8590" }}>{path}</div>
+                <div style={{ fontSize: 11.5, color: "#8a9099" }}>{path}</div>
                 <div style={{ marginTop: 5, fontSize: 11.5, color: stDef.color }}>{stDef.label} — {stDef.why}</div>
               </div>
             );
@@ -647,7 +647,7 @@ export default function GraphPage() {
               <div style={{
                 position: "absolute", top: 0, right: 0, bottom: 0, width: 392, maxWidth: "88vw",
                 background: "var(--surface)", borderLeft: "1px solid var(--border)",
-                boxShadow: "-12px 0 32px rgba(1,4,9,.35)",
+                boxShadow: "-12px 0 32px rgba(0,0,0,.18)",
                 display: "flex", flexDirection: "column", zIndex: 20,
                 animation: "vm-slidein .28s cubic-bezier(.4,0,.2,1) both",
               }}>
@@ -806,9 +806,9 @@ export default function GraphPage() {
             <div style={{
               position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)",
               zIndex: 60, display: "flex", alignItems: "center", gap: 9,
-              background: "rgba(13,17,23,.96)",
+              background: "var(--inset)",
               border: `1px solid color-mix(in srgb, ${toastColor} 45%, var(--border))`,
-              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(1,4,9,.6)",
+              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(0,0,0,.35)",
               animation: "vm-toast .25s both",
             }}>
               <span style={{ display: "inline-flex", color: toastColor }}>
@@ -819,7 +819,7 @@ export default function GraphPage() {
                   : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 }
               </span>
-              <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
+              <span style={{ fontSize: 13, color: "#e9eaec", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
             </div>
           )}
         </div>

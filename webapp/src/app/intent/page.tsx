@@ -33,7 +33,7 @@ function VaultNav({ theme, onToggle, liveLabel, liveDot }: {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 26, height: 26, borderRadius: 7,
-            background: "linear-gradient(135deg, var(--accent), #7d5bed)",
+            background: "linear-gradient(135deg, var(--accent), var(--accent-btn))",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)",
           }}>
@@ -153,7 +153,7 @@ const ENTRIES: Entry[] = [
     title: "Wire secret scanner into save path",
     summary: "Added scanForSecrets() guard before every node commit.",
     time: "just now", hash: "a1f93c2", diff: "+48 −6",
-    files: [{ name: "scan-secrets.ts", color: "#57ab5a" }, { name: "node-panel.tsx", color: "#db61a2" }],
+    files: [{ name: "scan-secrets.ts", color: "#46c98a" }, { name: "node-panel.tsx", color: "#e07ca6" }],
     reasoning: "User asked saves to be blocked when a credential is present. Hooked the scanner into editor save and the commit hook so both paths share one regex set; blocked nodes now surface a banner instead of silently committing.",
   },
   {
@@ -161,7 +161,7 @@ const ENTRIES: Entry[] = [
     title: "Cluster the force layout by path",
     summary: "Grouped nodes into path-based clusters with radial spokes from the intent hub.",
     time: "6m ago", hash: "7be0d14", diff: "+121 −33",
-    files: [{ name: "force-layout.ts", color: "#57ab5a" }],
+    files: [{ name: "force-layout.ts", color: "#46c98a" }],
     reasoning: "Flat Obsidian-style layout was unreadable past ~40 nodes. Anchored each top-level folder to a ring position and let leaves settle around their hub, keeping cross-folder wikilinks as faint links.",
   },
   {
@@ -169,7 +169,7 @@ const ENTRIES: Entry[] = [
     title: "Rotate AWS keys via Vault",
     summary: "Replace hardcoded key in rotate-keys.ts with a Vault fetch.",
     time: "14m ago", hash: "—", diff: "+9 −5",
-    files: [{ name: "rotate-keys.ts", color: "#4c8dff" }],
+    files: [{ name: "rotate-keys.ts", color: "#5b8cff" }],
     reasoning: "Scanner flagged a hardcoded AWS secret. Draft swaps it for refreshFromVault(); held back from auto-commit because it touches the auth boundary and wants a human glance.",
   },
   {
@@ -177,7 +177,7 @@ const ENTRIES: Entry[] = [
     title: "Parse wikilinks in frontmatter",
     summary: "Resolve [[links]] inside YAML values, not just body text.",
     time: "31m ago", hash: "3c81a07", diff: "+27 −2",
-    files: [{ name: "wikilink-parser.ts", color: "#57ab5a" }, { name: "frontmatter.ts", color: "#57ab5a" }],
+    files: [{ name: "wikilink-parser.ts", color: "#46c98a" }, { name: "frontmatter.ts", color: "#46c98a" }],
     reasoning: "Edges from frontmatter (e.g. intent_ref) were being dropped. Extended the parser to walk scalar YAML values so related-topic chips populate correctly.",
   },
   {
@@ -185,7 +185,7 @@ const ENTRIES: Entry[] = [
     title: "Draft handoff template",
     summary: "Generate next.md with open threads + pickup steps on SessionEnd.",
     time: "42m ago", hash: "—", diff: "+64 −0",
-    files: [{ name: "handoff.js", color: "#57ab5a" }],
+    files: [{ name: "handoff.js", color: "#46c98a" }],
     reasoning: "SessionEnd needs to leave the next session a usable brief. Drafted a template that pulls pending intents as open threads and the last committed goals as pickup steps.",
   },
   {
@@ -193,7 +193,7 @@ const ENTRIES: Entry[] = [
     title: "Initialise the watcher",
     summary: "Start chokidar on the vault and stream change events to the bus.",
     time: "1h ago", hash: "0d4a2e9", diff: "+88 −0",
-    files: [{ name: "watcher.ts", color: "#57ab5a" }, { name: "stream-bus.ts", color: "#57ab5a" }],
+    files: [{ name: "watcher.ts", color: "#46c98a" }, { name: "stream-bus.ts", color: "#46c98a" }],
     reasoning: "Foundation for live capture. Debounced filesystem events and pushed them onto an in-memory bus the graph subscribes to.",
   },
 ];
@@ -250,11 +250,11 @@ export default function IntentPage() {
     try { navigator.clipboard.writeText(txt).then(done, done); } catch { done(); }
   };
 
-  const amberColor = theme === "dark" ? "#d29922" : "#9a6700";
-  const greenColor = theme === "dark" ? "#3fb950" : "#1a7f37";
-  const redColor = theme === "dark" ? "#f85149" : "#cf222e";
-  const purpleColor = "#a371f7";
-  const accentColor = theme === "dark" ? "#388bfd" : "#0969da";
+  const amberColor = theme === "dark" ? "#dba53f" : "#9a6a10";
+  const greenColor = theme === "dark" ? "#46c98a" : "#0f8f63";
+  const redColor = theme === "dark" ? "#f26d78" : "#d23b48";
+  const purpleColor = "#3cc6cf";
+  const accentColor = theme === "dark" ? "#5b8cff" : "#2f5fe0";
 
   const STAT = {
     committed: { label: "committed", tagBg: `rgba(${theme === "dark" ? "63,185,80,.15" : "26,127,55,.12"})`, tagColor: greenColor, dot: greenColor },
@@ -330,7 +330,7 @@ export default function IntentPage() {
                   border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
                   background: mode === id ? "var(--accent-btn)" : "transparent",
                   color: mode === id ? "#fff" : "var(--muted)",
-                  boxShadow: mode === id ? "0 1px 2px rgba(1,4,9,.3)" : "none",
+                  boxShadow: mode === id ? "0 1px 2px rgba(8,9,14,.3)" : "none",
                   transition: "all .18s",
                 }}>
                   {id === "auto" ? <BoltIcon color={mode === "auto" ? "#fff" : "var(--muted)"} /> : <EyeIcon color={mode === "review" ? "#fff" : "var(--muted)"} />}

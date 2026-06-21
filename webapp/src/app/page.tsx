@@ -39,21 +39,21 @@ function MergeIcon() {
 // ---------------------------------------------------------------------------
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  decision:   { bg: "rgba(56,139,253,0.12)",  text: "#388bfd", border: "rgba(56,139,253,0.3)" },
-  constraint: { bg: "rgba(248,81,73,0.1)",    text: "#f85149", border: "rgba(248,81,73,0.3)" },
-  goal:       { bg: "rgba(63,185,80,0.12)",   text: "#3fb950", border: "rgba(63,185,80,0.3)" },
-  question:   { bg: "rgba(163,113,247,0.12)", text: "#a371f7", border: "rgba(163,113,247,0.3)" },
-  scope:      { bg: "rgba(210,153,34,0.15)",  text: "#d29922", border: "rgba(210,153,34,0.3)" },
+  decision:   { bg: "rgba(91,140,255,0.12)",  text: "#5b8cff", border: "rgba(91,140,255,0.3)" },
+  constraint: { bg: "rgba(242,109,120,0.1)",    text: "#f26d78", border: "rgba(242,109,120,0.3)" },
+  goal:       { bg: "rgba(70,201,138,0.12)",   text: "#46c98a", border: "rgba(70,201,138,0.3)" },
+  question:   { bg: "rgba(60,198,207,0.12)", text: "#3cc6cf", border: "rgba(60,198,207,0.3)" },
+  scope:      { bg: "rgba(219,165,63,0.15)",  text: "#dba53f", border: "rgba(219,165,63,0.3)" },
 };
 
 const EVENT_COLORS: Record<string, string> = {
-  created:        "#3fb950",
-  linked:         "#388bfd",
-  updated:        "#d29922",
-  deleted:        "#f85149",
-  "secret-detected": "#f85149",
-  "intent-updated":  "#a371f7",
-  "session-event":   "#7d8590",
+  created:        "#46c98a",
+  linked:         "#5b8cff",
+  updated:        "#dba53f",
+  deleted:        "#f26d78",
+  "secret-detected": "#f26d78",
+  "intent-updated":  "#3cc6cf",
+  "session-event":   "#8a9099",
 };
 
 // ---------------------------------------------------------------------------
@@ -87,14 +87,14 @@ function StatusPill({ connected }: { connected: boolean }) {
       display: "inline-flex", alignItems: "center", gap: 5,
       padding: "2px 8px", borderRadius: 9999,
       fontSize: 11, fontFamily: "var(--font-jetbrains-mono, monospace)",
-      background: connected ? "rgba(63,185,80,0.12)" : "rgba(248,81,73,0.1)",
-      color: connected ? "#3fb950" : "#f85149",
-      border: `1px solid ${connected ? "rgba(63,185,80,0.3)" : "rgba(248,81,73,0.25)"}`,
+      background: connected ? "rgba(70,201,138,0.12)" : "rgba(242,109,120,0.1)",
+      color: connected ? "#46c98a" : "#f26d78",
+      border: `1px solid ${connected ? "rgba(70,201,138,0.3)" : "rgba(242,109,120,0.25)"}`,
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: "50%",
-        background: connected ? "#3fb950" : "#f85149",
-        boxShadow: connected ? "0 0 0 2px rgba(63,185,80,0.3)" : "none",
+        background: connected ? "#46c98a" : "#f26d78",
+        boxShadow: connected ? "0 0 0 2px rgba(70,201,138,0.3)" : "none",
       }} />
       {connected ? "live" : "disconnected"}
     </span>
@@ -102,7 +102,7 @@ function StatusPill({ connected }: { connected: boolean }) {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const c = TYPE_COLORS[type] ?? { bg: "rgba(125,133,144,0.12)", text: "#7d8590", border: "rgba(125,133,144,0.25)" };
+  const c = TYPE_COLORS[type] ?? { bg: "rgba(138,144,153,0.12)", text: "#8a9099", border: "rgba(138,144,153,0.25)" };
   return (
     <span style={{
       padding: "1px 7px", borderRadius: 4, fontSize: 10,
@@ -142,8 +142,8 @@ function NodeCard({ node, highlighted }: NodeCardProps) {
             padding: "1px 7px", borderRadius: 4, fontSize: 10,
             fontFamily: "var(--font-jetbrains-mono, monospace)",
             fontWeight: 600, textTransform: "uppercase",
-            background: "rgba(63,185,80,0.1)", color: "#3fb950",
-            border: "1px solid rgba(63,185,80,0.25)",
+            background: "rgba(70,201,138,0.1)", color: "#46c98a",
+            border: "1px solid rgba(70,201,138,0.25)",
           }}>approved</span>
         )}
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>
@@ -194,7 +194,7 @@ export default function VaultPage() {
   // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute("data-vmtheme", theme === "light" ? "light" : "");
-    document.documentElement.style.background = theme === "light" ? "#ffffff" : "#0d1117";
+    document.documentElement.style.background = "var(--bg)";
   }, [theme]);
 
   // Load nodes from disk
@@ -303,7 +303,7 @@ export default function VaultPage() {
           {/* Stats row */}
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             {Object.entries(counts).map(([type, count]) => {
-              const c = TYPE_COLORS[type] ?? { bg: "rgba(125,133,144,0.1)", text: "var(--muted)", border: "rgba(125,133,144,0.2)" };
+              const c = TYPE_COLORS[type] ?? { bg: "rgba(138,144,153,0.1)", text: "var(--muted)", border: "rgba(138,144,153,0.2)" };
               return (
                 <div key={type} style={{
                   padding: "6px 12px", borderRadius: 6,
