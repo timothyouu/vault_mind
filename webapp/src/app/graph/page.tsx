@@ -93,6 +93,10 @@ interface GNode {
   status: "clean" | "pending" | "blocked";
   cx: number; cy: number; r: number;
   isCenter?: boolean; isHub?: boolean; orphan?: boolean;
+  // Display-toggle node kinds (Display panel: Tags / Attachments / Existing files only / Orphans)
+  attachment?: boolean;
+  tagNode?: boolean;
+  phantom?: boolean;
   // AC-1 node schema fields
   nodeId: string;
   nodeType: "decision" | "constraint" | "goal" | "question" | "scope";
@@ -634,6 +638,75 @@ function buildGraph() {
     });
   });
 
+  // Attachments — standing vault meta-docs (Constraints.md, TechStack.md) that many
+  // decision/constraint nodes link to via `related`, but that aren't themselves AC-1 nodes.
+  const attachmentData = [
+    { nodeId: "Constraints", title: "Project Constraints", cx: cx0 - 60, cy: 70 },
+    { nodeId: "TechStack",   title: "Tech Stack",           cx: cx0 + 60, cy: 70 },
+  ];
+  attachmentData.forEach(att => {
+    add({
+      id: "attachment:" + att.nodeId, label: att.nodeId, group: "vault", groupColor: "#6e7681", status: "clean",
+      cx: Math.max(46, Math.min(954, att.cx)), cy: Math.max(48, Math.min(712, att.cy)), r: 0,
+      nodeId: att.nodeId, nodeType: "scope", title: att.title,
+      created: "2026-06-20T18:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-20 18:00", reviewStatus: "approved",
+      related: [], flags: [],
+      orphan: false, isHub: true, attachment: true, deg: 0,
+    });
+  });
+  nodes.forEach(n => {
+    if (n.attachment) return;
+    attachmentData.forEach(att => {
+      if (n.related.includes(`[[${att.nodeId}]]`)) edges.push({ a: "attachment:" + att.nodeId, b: n.id, faint: true });
+    });
+  });
+
+  // Tags — one cluster node per AC-1 nodeType, linking every node of that type.
+  const tagTypes: GNode["nodeType"][] = ["decision", "constraint", "goal", "question", "scope"];
+  tagTypes.forEach((t, i) => {
+    const x = 220 + i * 140;
+    add({
+      id: "tag:" + t, label: "#" + t, group: "tags", groupColor: "#39c5cf", status: "clean",
+      cx: Math.max(46, Math.min(954, x)), cy: 706, r: 0,
+      nodeId: "tag-" + t, nodeType: t, title: `All "${t}" nodes`,
+      created: "2026-06-18T00:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+      related: [], flags: [],
+      orphan: false, isHub: true, tagNode: true, deg: 0,
+    });
+  });
+  nodes.forEach(n => {
+    if (n.isCenter || n.orphan || n.attachment || n.tagNode || n.phantom) return;
+    edges.push({ a: "tag:" + n.nodeType, b: n.id, faint: true });
+  });
+
+  // Phantom — files referenced conceptually (per SPEC's Out-of-Scope list) but never created.
+  // "Existing files only" hides these, mirroring Obsidian's phantom-link behaviour.
+  const phantomData = [
+    { name: "secret-patterns-override.md", parent: "security:secret-patterns", title: "Project-level additive secret-pattern override (stretch — not built)" },
+    { name: "vault-index-dynamic.md",      parent: "storage:vault-index",      title: "Dynamic VaultIndex.md BFS traversal (stretch — not built)" },
+  ];
+  phantomData.forEach(p => {
+    const parent = byId[p.parent];
+    const a = rand() * Math.PI * 2, d = 50 + rand() * 20;
+    const cx = parent ? parent.cx + Math.cos(a) * d : cx0;
+    const cy = parent ? parent.cy + Math.sin(a) * d * 0.8 : cy0;
+    const node = add({
+      id: "phantom:" + p.name, label: p.name, group: parent?.group ?? "vault", groupColor: "#484f58", status: "pending",
+      cx: Math.max(46, Math.min(954, cx)), cy: Math.max(48, Math.min(712, cy)), r: 0,
+      nodeId: "phantom-" + p.name.replace(/\.md$/, ""), nodeType: "question", title: p.title,
+      created: "2026-06-21T00:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-21 14:30", reviewStatus: "pending",
+      related: [], flags: [],
+      orphan: false, isHub: false, phantom: true, deg: 0,
+    });
+    if (parent) edges.push({ a: parent.id, b: node.id, faint: true });
+  });
+
   edges.forEach(e => {
     if (byId[e.a]) byId[e.a].deg = (byId[e.a].deg || 0) + 1;
     if (byId[e.b]) byId[e.b].deg = (byId[e.b].deg || 0) + 1;
@@ -766,7 +839,19 @@ export default function GraphPage() {
     return n.status;
   }, [overrides]);
 
-  const visible = G.nodes.filter(n => n.orphan ? toggles.orphans : true);
+  const nodeVisible = useCallback((n: GNode) => {
+    if (n.orphan && !toggles.orphans) return false;
+    if (n.attachment && !toggles.attachments) return false;
+    if (n.tagNode && !toggles.tags) return false;
+    if (n.phantom && toggles.existingOnly) return false;
+    return true;
+  }, [toggles]);
+
+  const visible = G.nodes.filter(nodeVisible);
+  const visibleEdges = G.edges.filter(e => {
+    const a = G.byId[e.a], b = G.byId[e.b];
+    return !!a && !!b && nodeVisible(a) && nodeVisible(b);
+  });
 
   const q = query.trim().toLowerCase();
   let activeSet: Set<string> | null = null;
@@ -804,8 +889,28 @@ export default function GraphPage() {
 
   const toastColor = toast?.kind === "bad" ? "var(--red)" : toast?.kind === "info" ? "var(--accent)" : "var(--green)";
 
+  // Theme-aware graph canvas colors. The SVG/overlay colors can't use CSS vars
+  // (they're hardcoded hex for the dark canvas), so derive them from `theme`
+  // here and the whole graph flips to a light palette in light mode.
+  const dark = theme === "dark";
+  const gfx = {
+    bg: dark
+      ? "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)"
+      : "radial-gradient(120% 120% at 50% 40%, #ffffff 0%, #eef1f5 72%)",
+    edge:        dark ? "#3d4f63" : "#c2cbd6",
+    edgeCross:   dark ? "#4e5c72" : "#aeb8c5",
+    edgeStrong:  dark ? "#b0bac6" : "#5b6672",
+    nodeStroke:  dark ? "#0b0f16" : "#ffffff",
+    hubStroke:   dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.18)",
+    centerStroke: dark ? "rgba(255,255,255,.28)" : "rgba(0,0,0,.24)",
+    selStroke:   dark ? "#ffffff" : "#1f2328",
+    labelFill:   dark ? "#c9d1d9" : "#1f2328",
+    labelStroke: dark ? "#010409" : "#ffffff",
+    chipBg:      dark ? "rgba(13,17,23,.78)" : "rgba(255,255,255,.82)",
+  };
+
   return (
-    <div style={{
+    <div className="vm-graph-root" style={{
       height: "100vh", display: "flex", flexDirection: "column",
       background: "var(--bg)", color: "var(--text)",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
@@ -817,6 +922,26 @@ export default function GraphPage() {
         @keyframes vm-livedot { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
         @keyframes vm-slidein { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes vm-toast { from { transform: translateY(8px); opacity: 0; } to { opacity: 1; } }
+
+        /* Scrollbars follow the active theme (var(--*) flip with data-vmtheme) */
+        .vm-graph-root, .vm-graph-root * {
+          scrollbar-width: thin;
+          scrollbar-color: var(--faint) transparent;
+        }
+        .vm-graph-root *::-webkit-scrollbar { width: 11px; height: 11px; }
+        .vm-graph-root *::-webkit-scrollbar-track { background: transparent; }
+        .vm-graph-root *::-webkit-scrollbar-thumb {
+          background: var(--faint);
+          border-radius: 8px;
+          border: 3px solid transparent;
+          background-clip: padding-box;
+        }
+        .vm-graph-root *::-webkit-scrollbar-thumb:hover {
+          background: var(--muted);
+          border: 3px solid transparent;
+          background-clip: padding-box;
+        }
+        .vm-graph-root *::-webkit-scrollbar-corner { background: transparent; }
       `}</style>
 
       <VaultNav theme={theme} onToggle={toggleTheme} liveCount={liveCount} />
@@ -913,21 +1038,27 @@ export default function GraphPage() {
           </div>
         </aside>
 
-        {/* CANVAS */}
+        {/* CANVAS ROW — viewport + side panel sit side-by-side so the panel never covers the graph */}
+        <div style={{
+          position: "relative", flex: 1, minWidth: 0, display: "flex", overflow: "hidden",
+        }}>
+
+        {/* GRAPH VIEWPORT */}
         <div style={{
           position: "relative", flex: 1, minWidth: 0,
-          background: "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)",
+          background: gfx.bg,
           overflow: "hidden",
+          transition: "flex-basis .25s ease, background .25s ease",
         }}>
           {/* Top-left toolbar */}
           <div style={{ position: "absolute", top: 14, left: 16, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px",
             }}>
               <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--muted)" }}>
-                {visible.length} nodes · {G.edges.length} links
+                {visible.length} nodes · {visibleEdges.length} links
               </span>
             </div>
             {hasFocus && (
@@ -935,7 +1066,7 @@ export default function GraphPage() {
                 onClick={() => { setSelectedId(null); setActiveGroup(null); setActiveStatus(null); setQuery(""); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+                  background: gfx.chipBg, backdropFilter: "blur(6px)",
                   border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px",
                   color: "var(--text)", fontSize: 12, fontWeight: 500, cursor: "pointer",
                 }}
@@ -964,7 +1095,7 @@ export default function GraphPage() {
             )}
             <Link href="/merge" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid color-mix(in srgb, var(--amber) 45%, var(--border))",
               borderRadius: 8, padding: "7px 12px", color: "var(--amber)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
             }}>
@@ -973,7 +1104,7 @@ export default function GraphPage() {
             </Link>
             <Link href="/intent" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "7px 12px",
               color: "var(--text)", fontSize: 12.5, fontWeight: 500, cursor: "pointer", textDecoration: "none",
             }}>
@@ -989,19 +1120,14 @@ export default function GraphPage() {
             style={{ width: "100%", height: "100%", display: "block" }}
           >
             <g>
-              {G.edges.filter(e => {
-                const a = G.byId[e.a], b = G.byId[e.b];
-                if (!a || !b) return false;
-                if ((a.orphan && !toggles.orphans) || (b.orphan && !toggles.orphans)) return false;
-                return true;
-              }).map((e, i) => {
+              {visibleEdges.map((e, i) => {
                 const a = G.byId[e.a], b = G.byId[e.b];
                 const on = isActive(e.a) && isActive(e.b);
                 const strong = !!(selectedId || hoverId) && on;
                 return (
                   <line key={i}
                     x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy}
-                    stroke={strong ? "#b0bac6" : (e.cross ? "#4e5c72" : "#3d4f63")}
+                    stroke={strong ? gfx.edgeStrong : (e.cross ? gfx.edgeCross : gfx.edge)}
                     strokeWidth={e.spoke ? 2 : (strong ? 1.8 : 1.3)}
                     opacity={activeSet ? (on ? (strong ? 0.9 : 0.55) : 0.06) : (e.spoke ? 0.48 : 0.34)}
                     style={{ transition: "opacity .25s" }}
@@ -1014,12 +1140,12 @@ export default function GraphPage() {
                 const st = effStatus(n);
                 const sel = n.id === selectedId;
                 let fill = n.groupColor;
-                let stroke = "#0b0f16", strokeW = 1;
+                let stroke = gfx.nodeStroke, strokeW = 1;
                 if (st === "blocked") { fill = "#f85149"; stroke = "#b5232b"; strokeW = 1.5; }
                 else if (st === "pending") { stroke = "#d29922"; strokeW = 2; }
-                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#d29922" : (st === "blocked" ? "#b5232b" : "rgba(255,255,255,.22)"); }
-                if (n.isCenter) { fill = "#6e7681"; stroke = "rgba(255,255,255,.28)"; strokeW = 2; }
-                if (sel) { stroke = "#ffffff"; strokeW = 2.6; }
+                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#d29922" : (st === "blocked" ? "#b5232b" : gfx.hubStroke); }
+                if (n.isCenter) { fill = "#6e7681"; stroke = gfx.centerStroke; strokeW = 2; }
+                if (sel) { stroke = gfx.selStroke; strokeW = 2.6; }
                 const showLabel = n.isCenter || (n.isHub && (!activeSet || isActive(n.id))) || sel || n.id === hoverId;
                 return (
                   <g key={n.id}
@@ -1035,8 +1161,8 @@ export default function GraphPage() {
                     <circle cx={n.cx} cy={n.cy} r={n.r} fill={fill} stroke={stroke} strokeWidth={strokeW} />
                     {showLabel && (
                       <text x={n.cx} y={n.cy - n.r - 7} textAnchor="middle"
-                        fontSize={n.isCenter ? 14 : 11} fill="#c9d1d9"
-                        stroke="#010409" strokeWidth="3" paintOrder="stroke"
+                        fontSize={n.isCenter ? 14 : 11} fill={gfx.labelFill}
+                        stroke={gfx.labelStroke} strokeWidth="3" paintOrder="stroke"
                         style={{ fontFamily: "-apple-system, sans-serif", fontWeight: 500, pointerEvents: "none", letterSpacing: ".2px" }}>
                         {n.label}
                       </text>
@@ -1053,7 +1179,12 @@ export default function GraphPage() {
             const st = effStatus(n);
             const stDef = STATUS[st];
             const grp = G.groups.find(x => x.id === n.group);
-            const path = n.isCenter ? "session intent" : (n.orphan ? "unlinked note" : (grp?.label ?? "") + n.label);
+            const path = n.isCenter ? "session intent"
+              : n.tagNode ? `tag cluster · #${n.nodeType}`
+              : n.phantom ? "phantom — file not created yet"
+              : n.attachment ? "attachment · vault meta-doc"
+              : n.orphan ? "unlinked note"
+              : (grp?.label ?? "") + n.label;
             return (
               <div style={{
                 position: "fixed", left: tipPos.x, top: tipPos.y, zIndex: 50,
@@ -1073,6 +1204,30 @@ export default function GraphPage() {
             );
           })()}
 
+          {/* Toast */}
+          {toast && (
+            <div style={{
+              position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)",
+              zIndex: 60, display: "flex", alignItems: "center", gap: 9,
+              background: "rgba(13,17,23,.96)",
+              border: `1px solid color-mix(in srgb, ${toastColor} 45%, var(--border))`,
+              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(1,4,9,.6)",
+              animation: "vm-toast .25s both",
+            }}>
+              <span style={{ display: "inline-flex", color: toastColor }}>
+                {toast.kind === "bad"
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                  : toast.kind === "info"
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                }
+              </span>
+              <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
+            </div>
+          )}
+        </div>
+        {/* end GRAPH VIEWPORT */}
+
           {/* Node side panel */}
           {selected && (() => {
             const st = effStatus(selected);
@@ -1080,6 +1235,9 @@ export default function GraphPage() {
             const grp = G.groups.find(x => x.id === selected.group);
             const path = selected.isCenter
               ? "vault/nodes/ship-trust-graph.md"
+              : selected.tagNode ? `tag · #${selected.nodeType} (${visible.filter(n => !n.isCenter && !n.orphan && !n.attachment && !n.tagNode && !n.phantom && n.nodeType === selected.nodeType).length} nodes)`
+              : selected.phantom ? "(not yet created) " + selected.label
+              : selected.attachment ? selected.nodeId + ".md"
               : (selected.orphan ? "(unlinked) " + selected.label : (grp?.label ?? "") + selected.nodeId + ".md");
             const nodeContent = contentFor(selected, overrides);
             const canCommit = !!commitMsg.trim();
@@ -1105,10 +1263,10 @@ export default function GraphPage() {
 
             return (
               <div style={{
-                position: "absolute", top: 0, right: 0, bottom: 0, width: 420, maxWidth: "88vw",
+                position: "relative", flexShrink: 0, width: 380, maxWidth: "38vw", height: "100%",
                 background: "var(--surface)", borderLeft: "1px solid var(--border)",
                 boxShadow: "-12px 0 32px rgba(1,4,9,.35)",
-                display: "flex", flexDirection: "column", zIndex: 20,
+                display: "flex", flexDirection: "column",
                 animation: "vm-slidein .28s cubic-bezier(.4,0,.2,1) both",
               }}>
                 {/* Panel header */}
@@ -1272,28 +1430,6 @@ export default function GraphPage() {
               </div>
             );
           })()}
-
-          {/* Toast */}
-          {toast && (
-            <div style={{
-              position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)",
-              zIndex: 60, display: "flex", alignItems: "center", gap: 9,
-              background: "rgba(13,17,23,.96)",
-              border: `1px solid color-mix(in srgb, ${toastColor} 45%, var(--border))`,
-              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(1,4,9,.6)",
-              animation: "vm-toast .25s both",
-            }}>
-              <span style={{ display: "inline-flex", color: toastColor }}>
-                {toast.kind === "bad"
-                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
-                  : toast.kind === "info"
-                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                }
-              </span>
-              <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>
