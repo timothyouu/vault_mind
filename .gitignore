@@ -28,5 +28,7 @@ vault/
 .idea/
 *.swp
 
+webapp/venv/
+
 # VaultMind cursors (per-session bookmark files)
 .vaultmind/cursors/
