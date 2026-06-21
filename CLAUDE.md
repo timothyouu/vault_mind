@@ -68,10 +68,17 @@ all agents. The only cross-language seams are `vault/*.md` on disk and Redis.
 - `package.json` (repo root) — `vaultmind:start` script + `dev` shortcut
 - `scripts/start.sh` — starts Redis (Docker), Python watcher, and Next.js dev server concurrently
 
+## Merge page (frontend ↔ backend)
+- `webapp/src/lib/conflicts.ts` — server-only: reads `vault/nodes/*.md`, parses git conflict markers into `Segment[]`, delegates secret scan to `python3 -m vaultmind.secrets` (one implementation per SPEC). Env var `REPO_ROOT` overrides the default `process.cwd()/..` path.
+- `webapp/src/app/api/conflicts/route.ts` — GET: list all conflicted nodes (summaries)
+- `webapp/src/app/api/conflicts/[id]/route.ts` — GET: full segment data for one node
+- `webapp/src/app/api/conflicts/[id]/resolve/route.ts` — POST `{ resolutions: Record<hunkIndex, 'ours'|'theirs'|'both'> }` → scans merged content for secrets via temp file, writes resolved node to disk. Returns `{ ok, secretBlocked?, scanSnippet? }`.
+- `webapp/src/app/merge/page.tsx` — client component: GitHub-dark conflict resolution UI matching VaultMind Merge design. Fetches conflicts list + per-node detail, renders diff editor with accept/reject per hunk, progress bar, scan-blocked panel, toast notifications, dark/light theme toggle.
+- `webapp/src/app/globals.css` — added VaultMind CSS variables (dark/light via `data-vmtheme`) + `vm-fade`/`vm-toast` keyframes.
+- `webapp/src/app/layout.tsx` — added JetBrains Mono font, updated metadata.
+
 ## Last Updated
-2026-06-20 — Bucket 4: Next.js webapp scaffold (create-next-app), SSE /api/events route,
-VaultMind vault page (NodeChangedEvent live list), redis npm package, root package.json,
-scripts/start.sh. TypeScript compiles clean (tsc --noEmit exit 0). webapp/types.ts preserved.
+2026-06-20 — Merge page implemented: conflict resolution UI (VaultMind Merge design) wired to real backend. API routes: GET /api/conflicts, GET /api/conflicts/[id], POST /api/conflicts/[id]/resolve. Server-side git conflict parser + secret scanner in webapp/src/lib/conflicts.ts. TypeScript compiles clean.
 
 2026-06-20 — Execution-model pivot (DEVIN-PIVOT-SPEC.md): updated SPEC.md, WORKSTREAMS.md, and
 CLAUDE.md to reflect Devin Cloud as the executor for foundation Buckets 2–4 and streams P1–P3;
