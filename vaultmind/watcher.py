@@ -418,6 +418,7 @@ def _process_message(
         if "data" in fields:
             raw = json.loads(fields["data"])
         else:
+            # Fields are individual keys; turn_text is nested JSON.
             raw = dict(fields)
             if isinstance(raw.get("turn_text"), str):
                 raw["turn_text"] = json.loads(raw["turn_text"])
@@ -425,6 +426,8 @@ def _process_message(
         qi = QueueItem.model_validate(raw)
     except Exception as exc:
         logger.error("Failed to deserialize QueueItem from msg %s: %s", msg_id, exc)
+        # Cannot publish progress without a turn_id; just log and do NOT ACK.
+        # The message stays in PEL and will be retried.
         return
 
     turn_id = qi.turn_id
@@ -495,11 +498,13 @@ def _process_message(
             err_str = str(exc)
             logger.error("Turn %s failed: %s", turn_id, err_str, exc_info=True)
             _publish_progress(r, turn_id, TurnStage.failed, error=err_str)
+            # Deliberately do NOT set idempotency stage to 'failed' so a retry
+            # can resume from the last successfully completed stage on redelivery.
 
         # Eval fires after ACK+done — outside the try block so a bug here
         # cannot trigger 'failed' progress or prevent ACK.
         # run_eval catches all its own exceptions; this is belt-and-suspenders.
-        if nodes_written and scribe_result is not None:
+        if nodes_written and link_results and scribe_result is not None:
             pass  # Task 4 fills this in
 
 

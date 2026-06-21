@@ -124,7 +124,15 @@ def test_stage_spans_are_children_of_turn(tmp_path):
 
     _process_message(r, "1-0", {"data": json.dumps(SAMPLE_QI_DATA)}, _vault(tmp_path), tracer)
 
-    span_names = [s.name for s in exporter.get_finished_spans()]
+    spans = exporter.get_finished_spans()
+    span_names = [s.name for s in spans]
     assert "stage.scribe" in span_names
     assert "stage.notecreator" in span_names
     assert "stage.connector" in span_names
+
+    turn_span = next(s for s in spans if s.name == "turn")
+    for stage_name in ("stage.scribe", "stage.notecreator", "stage.connector"):
+        stage_span = next(s for s in spans if s.name == stage_name)
+        assert stage_span.parent is not None
+        assert stage_span.parent.span_id == turn_span.context.span_id, \
+            f"{stage_name} is not a child of 'turn'"
