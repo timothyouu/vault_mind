@@ -913,11 +913,17 @@ export default function GraphPage() {
           </div>
         </aside>
 
-        {/* CANVAS */}
+        {/* CANVAS ROW — viewport + side panel sit side-by-side so the panel never covers the graph */}
+        <div style={{
+          position: "relative", flex: 1, minWidth: 0, display: "flex", overflow: "hidden",
+        }}>
+
+        {/* GRAPH VIEWPORT */}
         <div style={{
           position: "relative", flex: 1, minWidth: 0,
           background: "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)",
           overflow: "hidden",
+          transition: "flex-basis .25s ease",
         }}>
           {/* Top-left toolbar */}
           <div style={{ position: "absolute", top: 14, left: 16, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
@@ -1073,6 +1079,30 @@ export default function GraphPage() {
             );
           })()}
 
+          {/* Toast */}
+          {toast && (
+            <div style={{
+              position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)",
+              zIndex: 60, display: "flex", alignItems: "center", gap: 9,
+              background: "rgba(13,17,23,.96)",
+              border: `1px solid color-mix(in srgb, ${toastColor} 45%, var(--border))`,
+              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(1,4,9,.6)",
+              animation: "vm-toast .25s both",
+            }}>
+              <span style={{ display: "inline-flex", color: toastColor }}>
+                {toast.kind === "bad"
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                  : toast.kind === "info"
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                }
+              </span>
+              <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
+            </div>
+          )}
+        </div>
+        {/* end GRAPH VIEWPORT */}
+
           {/* Node side panel */}
           {selected && (() => {
             const st = effStatus(selected);
@@ -1105,10 +1135,10 @@ export default function GraphPage() {
 
             return (
               <div style={{
-                position: "absolute", top: 0, right: 0, bottom: 0, width: 420, maxWidth: "88vw",
+                position: "relative", flexShrink: 0, width: 380, maxWidth: "38vw", height: "100%",
                 background: "var(--surface)", borderLeft: "1px solid var(--border)",
                 boxShadow: "-12px 0 32px rgba(1,4,9,.35)",
-                display: "flex", flexDirection: "column", zIndex: 20,
+                display: "flex", flexDirection: "column",
                 animation: "vm-slidein .28s cubic-bezier(.4,0,.2,1) both",
               }}>
                 {/* Panel header */}
@@ -1272,28 +1302,6 @@ export default function GraphPage() {
               </div>
             );
           })()}
-
-          {/* Toast */}
-          {toast && (
-            <div style={{
-              position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)",
-              zIndex: 60, display: "flex", alignItems: "center", gap: 9,
-              background: "rgba(13,17,23,.96)",
-              border: `1px solid color-mix(in srgb, ${toastColor} 45%, var(--border))`,
-              borderRadius: 10, padding: "10px 14px", boxShadow: "0 10px 30px rgba(1,4,9,.6)",
-              animation: "vm-toast .25s both",
-            }}>
-              <span style={{ display: "inline-flex", color: toastColor }}>
-                {toast.kind === "bad"
-                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
-                  : toast.kind === "info"
-                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                }
-              </span>
-              <span style={{ fontSize: 13, color: "#e6edf3", fontFamily: "var(--font-jetbrains-mono, monospace)" }}>{toast.msg}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>
