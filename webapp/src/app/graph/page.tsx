@@ -93,6 +93,10 @@ interface GNode {
   status: "clean" | "pending" | "blocked";
   cx: number; cy: number; r: number;
   isCenter?: boolean; isHub?: boolean; orphan?: boolean;
+  // Display-toggle node kinds (Display panel: Tags / Attachments / Existing files only / Orphans)
+  attachment?: boolean;
+  tagNode?: boolean;
+  phantom?: boolean;
   // AC-1 node schema fields
   nodeId: string;
   nodeType: "decision" | "constraint" | "goal" | "question" | "scope";
@@ -634,6 +638,75 @@ function buildGraph() {
     });
   });
 
+  // Attachments — standing vault meta-docs (Constraints.md, TechStack.md) that many
+  // decision/constraint nodes link to via `related`, but that aren't themselves AC-1 nodes.
+  const attachmentData = [
+    { nodeId: "Constraints", title: "Project Constraints", cx: cx0 - 60, cy: 70 },
+    { nodeId: "TechStack",   title: "Tech Stack",           cx: cx0 + 60, cy: 70 },
+  ];
+  attachmentData.forEach(att => {
+    add({
+      id: "attachment:" + att.nodeId, label: att.nodeId, group: "vault", groupColor: "#6e7681", status: "clean",
+      cx: Math.max(46, Math.min(954, att.cx)), cy: Math.max(48, Math.min(712, att.cy)), r: 0,
+      nodeId: att.nodeId, nodeType: "scope", title: att.title,
+      created: "2026-06-20T18:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-20 18:00", reviewStatus: "approved",
+      related: [], flags: [],
+      orphan: false, isHub: true, attachment: true, deg: 0,
+    });
+  });
+  nodes.forEach(n => {
+    if (n.attachment) return;
+    attachmentData.forEach(att => {
+      if (n.related.includes(`[[${att.nodeId}]]`)) edges.push({ a: "attachment:" + att.nodeId, b: n.id, faint: true });
+    });
+  });
+
+  // Tags — one cluster node per AC-1 nodeType, linking every node of that type.
+  const tagTypes: GNode["nodeType"][] = ["decision", "constraint", "goal", "question", "scope"];
+  tagTypes.forEach((t, i) => {
+    const x = 220 + i * 140;
+    add({
+      id: "tag:" + t, label: "#" + t, group: "tags", groupColor: "#39c5cf", status: "clean",
+      cx: Math.max(46, Math.min(954, x)), cy: 706, r: 0,
+      nodeId: "tag-" + t, nodeType: t, title: `All "${t}" nodes`,
+      created: "2026-06-18T00:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-18 10:15", reviewStatus: "approved",
+      related: [], flags: [],
+      orphan: false, isHub: true, tagNode: true, deg: 0,
+    });
+  });
+  nodes.forEach(n => {
+    if (n.isCenter || n.orphan || n.attachment || n.tagNode || n.phantom) return;
+    edges.push({ a: "tag:" + n.nodeType, b: n.id, faint: true });
+  });
+
+  // Phantom — files referenced conceptually (per SPEC's Out-of-Scope list) but never created.
+  // "Existing files only" hides these, mirroring Obsidian's phantom-link behaviour.
+  const phantomData = [
+    { name: "secret-patterns-override.md", parent: "security:secret-patterns", title: "Project-level additive secret-pattern override (stretch — not built)" },
+    { name: "vault-index-dynamic.md",      parent: "storage:vault-index",      title: "Dynamic VaultIndex.md BFS traversal (stretch — not built)" },
+  ];
+  phantomData.forEach(p => {
+    const parent = byId[p.parent];
+    const a = rand() * Math.PI * 2, d = 50 + rand() * 20;
+    const cx = parent ? parent.cx + Math.cos(a) * d : cx0;
+    const cy = parent ? parent.cy + Math.sin(a) * d * 0.8 : cy0;
+    const node = add({
+      id: "phantom:" + p.name, label: p.name, group: parent?.group ?? "vault", groupColor: "#484f58", status: "pending",
+      cx: Math.max(46, Math.min(954, cx)), cy: Math.max(48, Math.min(712, cy)), r: 0,
+      nodeId: "phantom-" + p.name.replace(/\.md$/, ""), nodeType: "question", title: p.title,
+      created: "2026-06-21T00:00:00-07:00",
+      sourceTool: "claude-code", sourceSession: "00893aaf-19fa",
+      intentRef: "2026-06-21 14:30", reviewStatus: "pending",
+      related: [], flags: [],
+      orphan: false, isHub: false, phantom: true, deg: 0,
+    });
+    if (parent) edges.push({ a: parent.id, b: node.id, faint: true });
+  });
+
   edges.forEach(e => {
     if (byId[e.a]) byId[e.a].deg = (byId[e.a].deg || 0) + 1;
     if (byId[e.b]) byId[e.b].deg = (byId[e.b].deg || 0) + 1;
@@ -766,7 +839,19 @@ export default function GraphPage() {
     return n.status;
   }, [overrides]);
 
-  const visible = G.nodes.filter(n => n.orphan ? toggles.orphans : true);
+  const nodeVisible = useCallback((n: GNode) => {
+    if (n.orphan && !toggles.orphans) return false;
+    if (n.attachment && !toggles.attachments) return false;
+    if (n.tagNode && !toggles.tags) return false;
+    if (n.phantom && toggles.existingOnly) return false;
+    return true;
+  }, [toggles]);
+
+  const visible = G.nodes.filter(nodeVisible);
+  const visibleEdges = G.edges.filter(e => {
+    const a = G.byId[e.a], b = G.byId[e.b];
+    return !!a && !!b && nodeVisible(a) && nodeVisible(b);
+  });
 
   const q = query.trim().toLowerCase();
   let activeSet: Set<string> | null = null;
@@ -933,7 +1018,7 @@ export default function GraphPage() {
               border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px",
             }}>
               <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--muted)" }}>
-                {visible.length} nodes · {G.edges.length} links
+                {visible.length} nodes · {visibleEdges.length} links
               </span>
             </div>
             {hasFocus && (
@@ -995,12 +1080,7 @@ export default function GraphPage() {
             style={{ width: "100%", height: "100%", display: "block" }}
           >
             <g>
-              {G.edges.filter(e => {
-                const a = G.byId[e.a], b = G.byId[e.b];
-                if (!a || !b) return false;
-                if ((a.orphan && !toggles.orphans) || (b.orphan && !toggles.orphans)) return false;
-                return true;
-              }).map((e, i) => {
+              {visibleEdges.map((e, i) => {
                 const a = G.byId[e.a], b = G.byId[e.b];
                 const on = isActive(e.a) && isActive(e.b);
                 const strong = !!(selectedId || hoverId) && on;
@@ -1059,7 +1139,12 @@ export default function GraphPage() {
             const st = effStatus(n);
             const stDef = STATUS[st];
             const grp = G.groups.find(x => x.id === n.group);
-            const path = n.isCenter ? "session intent" : (n.orphan ? "unlinked note" : (grp?.label ?? "") + n.label);
+            const path = n.isCenter ? "session intent"
+              : n.tagNode ? `tag cluster · #${n.nodeType}`
+              : n.phantom ? "phantom — file not created yet"
+              : n.attachment ? "attachment · vault meta-doc"
+              : n.orphan ? "unlinked note"
+              : (grp?.label ?? "") + n.label;
             return (
               <div style={{
                 position: "fixed", left: tipPos.x, top: tipPos.y, zIndex: 50,
@@ -1110,6 +1195,9 @@ export default function GraphPage() {
             const grp = G.groups.find(x => x.id === selected.group);
             const path = selected.isCenter
               ? "vault/nodes/ship-trust-graph.md"
+              : selected.tagNode ? `tag · #${selected.nodeType} (${visible.filter(n => !n.isCenter && !n.orphan && !n.attachment && !n.tagNode && !n.phantom && n.nodeType === selected.nodeType).length} nodes)`
+              : selected.phantom ? "(not yet created) " + selected.label
+              : selected.attachment ? selected.nodeId + ".md"
               : (selected.orphan ? "(unlinked) " + selected.label : (grp?.label ?? "") + selected.nodeId + ".md");
             const nodeContent = contentFor(selected, overrides);
             const canCommit = !!commitMsg.trim();
