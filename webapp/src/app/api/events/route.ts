@@ -42,6 +42,11 @@ export async function GET(_req: NextRequest) {
         } catch { /* stream already closed */ }
       });
 
+      // Flush HTTP headers immediately — without this Next.js buffers the
+      // response until the first enqueue(), which can take 15s (keepAlive).
+      // Browser EventSource times out waiting for headers and enters retry loop.
+      controller.enqueue(encoder.encode(": connected\n\n"));
+
       // Cleanup on close (best effort)
       _req.signal.addEventListener("abort", async () => {
         closed = true;
