@@ -163,6 +163,9 @@ def _run_agent() -> None:
         text = " ".join(
             item.text for item in msg.content if hasattr(item, "text")
         )
+        if not text:
+            logger.warning("Bridge: received ChatMessage with no text content from %s", sender)
+            return
         logger.info("Bridge ← agent reply: %s", text[:120])
         enqueue_reply(text)
         ack = ChatAcknowledgement(acknowledged=True)
