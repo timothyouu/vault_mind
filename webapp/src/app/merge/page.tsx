@@ -291,8 +291,8 @@ export default function MergePage() {
             <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-.2px" }}>VaultMind</span>
           </div>
           <nav style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 6 }}>
-            {(["Setup", "Graph", "Intent log"] as const).map((label) => (
-              <a key={label} href={`/${label.toLowerCase().replace(" ", "-")}`} style={{ padding: "6px 11px", borderRadius: 7, fontSize: 13, color: v("--muted"), textDecoration: "none" }}>
+            {([["Setup", "/setup"], ["Graph", "/graph"], ["Intent log", "/intent"]] as const).map(([label, href]) => (
+              <a key={label} href={href} style={{ padding: "6px 11px", borderRadius: 7, fontSize: 13, color: v("--muted"), textDecoration: "none" }}>
                 {label}
               </a>
             ))}
