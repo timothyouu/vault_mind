@@ -4,6 +4,16 @@
 # Source: vaultmind/hooks/pre-commit.sh
 set -euo pipefail
 
+# python3 on Linux/Mac; Windows may only have 'python'
+if command -v python3 &>/dev/null; then
+    PYTHON=python3
+elif command -v python &>/dev/null; then
+    PYTHON=python
+else
+    echo "Error: Python not found in PATH" >&2
+    exit 1
+fi
+
 FAILED=0
 
 # Get list of staged vault/ files
@@ -18,10 +28,10 @@ for FILE in $STAGED; do
         continue
     fi
     # python -m vaultmind.secrets always exits 0; we read the JSON
-    RESULT=$(python3 -m vaultmind.secrets "$FILE")
-    COUNT=$(echo "$RESULT" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data))")
+    RESULT=$($PYTHON -m vaultmind.secrets "$FILE")
+    COUNT=$(echo "$RESULT" | $PYTHON -c "import sys,json; data=json.load(sys.stdin); print(len(data))")
     if [ "$COUNT" -gt 0 ]; then
-        echo "$RESULT" | python3 -c "
+        echo "$RESULT" | $PYTHON -c "
 import sys, json
 data = json.load(sys.stdin)
 for m in data:

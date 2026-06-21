@@ -96,6 +96,19 @@ def test_write_time_clean() -> None:
 # 2. Commit-time behavior (pre-commit hook)
 # ---------------------------------------------------------------------------
 
+def _find_git_bash() -> str:
+    """Return path to Git Bash (MSYS2) on Windows; falls back to 'bash' on other OS."""
+    if sys.platform != "win32":
+        return "bash"
+    for candidate in [
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\usr\bin\bash.exe",
+    ]:
+        if pathlib.Path(candidate).exists():
+            return candidate
+    return "bash"
+
+
 def _run_hook_in_temp_repo(vault_file_content: str | None) -> subprocess.CompletedProcess:
     """
     Create a temp git repo with a vault/ file, stage it, and run the pre-commit hook.
@@ -136,16 +149,34 @@ def _run_hook_in_temp_repo(vault_file_content: str | None) -> subprocess.Complet
         # script resolve to our temp repo, and set the working directory to tmp
         # so relative `vault/` paths resolve correctly.
         env = os.environ.copy()
+        # git.exe understands Windows-style paths for these vars.
         env["GIT_DIR"] = str(tmp / ".git")
         env["GIT_WORK_TREE"] = str(tmp)
         # Ensure the vaultmind package is importable from within the hook.
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = (
-            str(REPO_ROOT) + (":" + existing_pythonpath if existing_pythonpath else "")
+            str(REPO_ROOT) + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
         )
 
+        bash = _find_git_bash()
+        if sys.platform == "win32":
+            # When Python (a native Windows process) spawns bash, the system
+            # bash (C:\Windows\System32\bash.exe = WSL) lacks pipefail support
+            # when invoked this way.  Use Git Bash (MSYS2) explicitly instead.
+            # Git Bash needs its own bin dir (grep, etc.) and the Windows Python
+            # dir prepended to PATH so the hook's `python` / `python3` resolves.
+            git_bash_bin = str(pathlib.Path(bash).parent) if bash != "bash" else ""
+            python_dir = str(pathlib.Path(sys.executable).parent)
+            extra = ";".join(p for p in [git_bash_bin, python_dir] if p)
+            env["PATH"] = extra + ";" + env.get("PATH", "")
+
+        # Pipe the script content via stdin to sidestep Windows path-resolution
+        # issues with bash.exe receiving a script-file argument.  Normalize
+        # CRLF → LF so autocrlf=true checkouts don't embed \r in option names.
+        hook_src = HOOK_SCRIPT.read_text(encoding="utf-8").replace("\r\n", "\n")
         result = subprocess.run(
-            ["bash", str(HOOK_SCRIPT)],
+            [bash, "-s"],
+            input=hook_src,
             capture_output=True,
             text=True,
             cwd=str(tmp),
