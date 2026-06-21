@@ -53,7 +53,8 @@ def init_arize(service_name: str) -> Optional[object]:
       from vaultmind.arize_init import init_arize, SERVICE_PIPELINE
       init_arize(SERVICE_PIPELINE)
     """
-    space_key = os.environ.get("ARIZE_SPACE_KEY")
+    # Support both legacy ARIZE_SPACE_KEY and current ARIZE_SPACE_ID env var names.
+    space_key = os.environ.get("ARIZE_SPACE_ID") or os.environ.get("ARIZE_SPACE_KEY")
     api_key   = os.environ.get("ARIZE_API_KEY")
     required  = os.environ.get("VAULTMIND_ARIZE_REQUIRED", "").lower() in ("1", "true", "yes")
 
@@ -79,10 +80,9 @@ def init_arize(service_name: str) -> Optional[object]:
         from arize.otel import register
 
         tracer_provider = register(
-            space_key=space_key,
+            space_id=space_key,
             api_key=api_key,
-            model_id=ARIZE_PROJECT,
-            model_version=service_name,
+            project_name=service_name,
         )
         logger.info(
             "Arize tracing initialized: project=%s service=%s",

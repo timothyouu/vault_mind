@@ -6,6 +6,17 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
+# Load .env.local into the current process environment before spawning children.
+$envFile = Join-Path $RepoRoot ".env.local"
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*([A-Z_][A-Z0-9_]*)=(.*)$') {
+            [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+        }
+    }
+    Write-Host "      Loaded .env.local" -ForegroundColor Green
+}
+
 Write-Host "=== VaultMind: starting all processes ===" -ForegroundColor Cyan
 
 # 1. Redis via docker compose (idempotent)
