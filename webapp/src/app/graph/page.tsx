@@ -889,8 +889,28 @@ export default function GraphPage() {
 
   const toastColor = toast?.kind === "bad" ? "var(--red)" : toast?.kind === "info" ? "var(--accent)" : "var(--green)";
 
+  // Theme-aware graph canvas colors. The SVG/overlay colors can't use CSS vars
+  // (they're hardcoded hex for the dark canvas), so derive them from `theme`
+  // here and the whole graph flips to a light palette in light mode.
+  const dark = theme === "dark";
+  const gfx = {
+    bg: dark
+      ? "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)"
+      : "radial-gradient(120% 120% at 50% 40%, #ffffff 0%, #eef1f5 72%)",
+    edge:        dark ? "#3d4f63" : "#c2cbd6",
+    edgeCross:   dark ? "#4e5c72" : "#aeb8c5",
+    edgeStrong:  dark ? "#b0bac6" : "#5b6672",
+    nodeStroke:  dark ? "#0b0f16" : "#ffffff",
+    hubStroke:   dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.18)",
+    centerStroke: dark ? "rgba(255,255,255,.28)" : "rgba(0,0,0,.24)",
+    selStroke:   dark ? "#ffffff" : "#1f2328",
+    labelFill:   dark ? "#c9d1d9" : "#1f2328",
+    labelStroke: dark ? "#010409" : "#ffffff",
+    chipBg:      dark ? "rgba(13,17,23,.78)" : "rgba(255,255,255,.82)",
+  };
+
   return (
-    <div style={{
+    <div className="vm-graph-root" style={{
       height: "100vh", display: "flex", flexDirection: "column",
       background: "var(--bg)", color: "var(--text)",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
@@ -902,6 +922,26 @@ export default function GraphPage() {
         @keyframes vm-livedot { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
         @keyframes vm-slidein { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes vm-toast { from { transform: translateY(8px); opacity: 0; } to { opacity: 1; } }
+
+        /* Scrollbars follow the active theme (var(--*) flip with data-vmtheme) */
+        .vm-graph-root, .vm-graph-root * {
+          scrollbar-width: thin;
+          scrollbar-color: var(--faint) transparent;
+        }
+        .vm-graph-root *::-webkit-scrollbar { width: 11px; height: 11px; }
+        .vm-graph-root *::-webkit-scrollbar-track { background: transparent; }
+        .vm-graph-root *::-webkit-scrollbar-thumb {
+          background: var(--faint);
+          border-radius: 8px;
+          border: 3px solid transparent;
+          background-clip: padding-box;
+        }
+        .vm-graph-root *::-webkit-scrollbar-thumb:hover {
+          background: var(--muted);
+          border: 3px solid transparent;
+          background-clip: padding-box;
+        }
+        .vm-graph-root *::-webkit-scrollbar-corner { background: transparent; }
       `}</style>
 
       <VaultNav theme={theme} onToggle={toggleTheme} liveCount={liveCount} />
@@ -1006,15 +1046,15 @@ export default function GraphPage() {
         {/* GRAPH VIEWPORT */}
         <div style={{
           position: "relative", flex: 1, minWidth: 0,
-          background: "radial-gradient(120% 120% at 50% 40%, #0b1018 0%, #010409 70%)",
+          background: gfx.bg,
           overflow: "hidden",
-          transition: "flex-basis .25s ease",
+          transition: "flex-basis .25s ease, background .25s ease",
         }}>
           {/* Top-left toolbar */}
           <div style={{ position: "absolute", top: 14, left: 16, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px",
             }}>
               <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 12, color: "var(--muted)" }}>
@@ -1026,7 +1066,7 @@ export default function GraphPage() {
                 onClick={() => { setSelectedId(null); setActiveGroup(null); setActiveStatus(null); setQuery(""); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+                  background: gfx.chipBg, backdropFilter: "blur(6px)",
                   border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px",
                   color: "var(--text)", fontSize: 12, fontWeight: 500, cursor: "pointer",
                 }}
@@ -1055,7 +1095,7 @@ export default function GraphPage() {
             )}
             <Link href="/merge" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid color-mix(in srgb, var(--amber) 45%, var(--border))",
               borderRadius: 8, padding: "7px 12px", color: "var(--amber)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", textDecoration: "none",
             }}>
@@ -1064,7 +1104,7 @@ export default function GraphPage() {
             </Link>
             <Link href="/intent" style={{
               display: "flex", alignItems: "center", gap: 8,
-              background: "rgba(13,17,23,.78)", backdropFilter: "blur(6px)",
+              background: gfx.chipBg, backdropFilter: "blur(6px)",
               border: "1px solid var(--border)", borderRadius: 8, padding: "7px 12px",
               color: "var(--text)", fontSize: 12.5, fontWeight: 500, cursor: "pointer", textDecoration: "none",
             }}>
@@ -1087,7 +1127,7 @@ export default function GraphPage() {
                 return (
                   <line key={i}
                     x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy}
-                    stroke={strong ? "#b0bac6" : (e.cross ? "#4e5c72" : "#3d4f63")}
+                    stroke={strong ? gfx.edgeStrong : (e.cross ? gfx.edgeCross : gfx.edge)}
                     strokeWidth={e.spoke ? 2 : (strong ? 1.8 : 1.3)}
                     opacity={activeSet ? (on ? (strong ? 0.9 : 0.55) : 0.06) : (e.spoke ? 0.48 : 0.34)}
                     style={{ transition: "opacity .25s" }}
@@ -1100,12 +1140,12 @@ export default function GraphPage() {
                 const st = effStatus(n);
                 const sel = n.id === selectedId;
                 let fill = n.groupColor;
-                let stroke = "#0b0f16", strokeW = 1;
+                let stroke = gfx.nodeStroke, strokeW = 1;
                 if (st === "blocked") { fill = "#f85149"; stroke = "#b5232b"; strokeW = 1.5; }
                 else if (st === "pending") { stroke = "#d29922"; strokeW = 2; }
-                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#d29922" : (st === "blocked" ? "#b5232b" : "rgba(255,255,255,.22)"); }
-                if (n.isCenter) { fill = "#6e7681"; stroke = "rgba(255,255,255,.28)"; strokeW = 2; }
-                if (sel) { stroke = "#ffffff"; strokeW = 2.6; }
+                if (n.isHub && !n.isCenter) { stroke = st === "pending" ? "#d29922" : (st === "blocked" ? "#b5232b" : gfx.hubStroke); }
+                if (n.isCenter) { fill = "#6e7681"; stroke = gfx.centerStroke; strokeW = 2; }
+                if (sel) { stroke = gfx.selStroke; strokeW = 2.6; }
                 const showLabel = n.isCenter || (n.isHub && (!activeSet || isActive(n.id))) || sel || n.id === hoverId;
                 return (
                   <g key={n.id}
@@ -1121,8 +1161,8 @@ export default function GraphPage() {
                     <circle cx={n.cx} cy={n.cy} r={n.r} fill={fill} stroke={stroke} strokeWidth={strokeW} />
                     {showLabel && (
                       <text x={n.cx} y={n.cy - n.r - 7} textAnchor="middle"
-                        fontSize={n.isCenter ? 14 : 11} fill="#c9d1d9"
-                        stroke="#010409" strokeWidth="3" paintOrder="stroke"
+                        fontSize={n.isCenter ? 14 : 11} fill={gfx.labelFill}
+                        stroke={gfx.labelStroke} strokeWidth="3" paintOrder="stroke"
                         style={{ fontFamily: "-apple-system, sans-serif", fontWeight: 500, pointerEvents: "none", letterSpacing: ".2px" }}>
                         {n.label}
                       </text>
