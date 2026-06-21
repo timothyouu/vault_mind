@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Node
+webapp/node_modules/
+webapp/.next/
+
+# VaultMind runtime
+vault/
+*.lock
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editor
+.DS_Store
+.idea/
+*.swp

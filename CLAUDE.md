@@ -31,6 +31,20 @@ Python pipeline + hooks + Orchestrator (a published Fetch.AI uAgent); TypeScript
 full-stack web app. Redis = queue (Streams) + event bus (pub/sub) + vector memory. Arize across
 all agents. The only cross-language seams are `vault/*.md` on disk and Redis.
 
+## Webapp scaffold (Bucket 4 — walking skeleton)
+- `webapp/` — Next.js 15 app (TypeScript, Tailwind, ESLint, App Router, `src/` layout)
+  - `webapp/types.ts` — frozen TS contracts; **do not edit** (mirrors `vaultmind/contracts.py`)
+  - `webapp/src/app/page.tsx` — VaultMind vault page; SSE client, live event list
+  - `webapp/src/app/api/events/route.ts` — SSE endpoint; subscribes to `vaultmind:events` Redis pub/sub
+  - `webapp/package.json` — includes `redis ^6.0.0` dependency
+- `package.json` (repo root) — `vaultmind:start` script + `dev` shortcut
+- `scripts/start.sh` — starts Redis (Docker), Python watcher, and Next.js dev server concurrently
+
+## Last Updated
+2026-06-20 — Bucket 4: Next.js webapp scaffold (create-next-app), SSE /api/events route,
+VaultMind vault page (NodeChangedEvent live list), redis npm package, root package.json,
+scripts/start.sh. TypeScript compiles clean (tsc --noEmit exit 0). webapp/types.ts preserved.
+
 ## Devin execution rules (foundation Buckets 2–4, and streams P1, P2, P3)
 - **Hard-stop per bucket.** Complete exactly one bucket, post the diff, and halt until a human
   approves and merges via Devin Review. Do not begin the next bucket without that approval.

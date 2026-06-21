@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 .vaultmind/hooks/on_stop.py", "async": true } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "python3 .vaultmind/hooks/on_session_end.py", "async": true } ] }
+    ]
+  }
+}

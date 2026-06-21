@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 .vaultmind/hooks/on_stop.py" } ] }
+    ]
+  }
+}
