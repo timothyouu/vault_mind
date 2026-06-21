@@ -1,49 +1,48 @@
 """
-.vaultmind/hooks/on_stop.py — P1 stub hook (Stop event).
+.vaultmind/hooks/on_stop.py — Stop hook for Claude Code and Codex.
 
-Invoked by Claude Code and Codex after every turn via the Stop hook.
-Hook config references:
-  .claude/settings.json  → hooks.Stop[].command
-  .codex/hooks.json      → hooks.Stop[].command
-
-P1 (Ingestion stream) replaces this stub with the real implementation:
-  - Read turn_text from hook stdin (JSON: {session_id, turn_id, transcript_path, ...})
-  - Produce a QueueItem to Redis Stream vaultmind:turns via XADD
-  - Must stay minimal and always succeed (even if Redis is unavailable) so the
-    developer's tool is never blocked by a watcher failure.
-
-AC-6 constraints:
-  - transcript_path may be null on Codex — handle gracefully
-  - This hook runs synchronously on Codex (async:true is ignored there)
-  - Never create the vaultmind-workers consumer group — that is the watcher's job
-  - Always exit 0; a non-zero exit blocks the developer's tool turn
-
-Stdin format (from Claude Code / Codex hook protocol):
-  JSON object with at least: session_id, turn_id, transcript_path (str|null),
-  user_text, assistant_text (or equivalent turn fields — confirm at build time).
+Called after every turn. Reads new turns from transcript, enqueues
+to Redis, updates cursor. Always exits 0 — never blocks the session.
 """
-
 from __future__ import annotations
 
 import json
+import os
 import sys
-import datetime
 
 
 def main() -> None:
-    # Read hook payload from stdin.
     try:
         payload = json.load(sys.stdin)
     except Exception:
-        # Malformed stdin — log and exit cleanly so the tool isn't blocked.
-        sys.stderr.write("on_stop.py: failed to parse hook stdin; skipping.\n")
         sys.exit(0)
 
-    # TODO (P1): extract turn fields and enqueue a QueueItem to vaultmind:turns.
-    # Skeleton: just log the turn_id so the hook is exercisable during Bucket 5.
-    turn_id = payload.get("turn_id", "unknown")
-    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    sys.stderr.write(f"on_stop.py [stub]: turn {turn_id!r} at {ts} — P1 not yet wired\n")
+    session_id      = payload.get("session_id", "unknown")
+    transcript_path = payload.get("transcript_path")   # None on Codex
+    redis_url       = os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+    try:
+        from vaultmind.ingest import cursor as _cursor
+        from vaultmind.ingest import reader as _reader
+        from vaultmind.ingest import producer as _producer
+        from vaultmind.ingest import session_state as _ss
+        from vaultmind.contracts import SourceTool
+
+        last_uuid = _cursor.load(session_id)
+        turns, flags = _reader.parse(transcript_path, last_uuid)
+
+        for t in turns:
+            _producer.enqueue(
+                t.turn_text, session_id, transcript_path,
+                SourceTool.claude_code, redis_url,
+            )
+
+        if turns:
+            _cursor.save(session_id, turns[-1].uuid)
+            _ss.turn_enqueued(session_id, len(turns), flags)
+
+    except Exception as exc:
+        sys.stderr.write(f"on_stop.py: unexpected error: {exc}\n")
 
     sys.exit(0)
 
