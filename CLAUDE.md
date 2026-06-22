@@ -72,12 +72,33 @@ all agents. The only cross-language seams are `vault/*.md` on disk and Redis.
 - `webapp/src/lib/conflicts.ts` — server-only: reads `vault/nodes/*.md`, parses git conflict markers into `Segment[]`, delegates secret scan to `python3 -m vaultmind.secrets` (one implementation per SPEC). Env var `REPO_ROOT` overrides the default `process.cwd()/..` path.
 - `webapp/src/app/api/conflicts/route.ts` — GET: list all conflicted nodes (summaries)
 - `webapp/src/app/api/conflicts/[id]/route.ts` — GET: full segment data for one node
-- `webapp/src/app/api/conflicts/[id]/resolve/route.ts` — POST `{ resolutions: Record<hunkIndex, 'ours'|'theirs'|'both'> }` → scans merged content for secrets via temp file, writes resolved node to disk. Returns `{ ok, secretBlocked?, scanSnippet? }`.
-- `webapp/src/app/merge/page.tsx` — client component: GitHub-dark conflict resolution UI matching VaultMind Merge design. Fetches conflicts list + per-node detail, renders diff editor with accept/reject per hunk, progress bar, scan-blocked panel, toast notifications, dark/light theme toggle.
+- `webapp/src/app/api/conflicts/[id]/resolve/route.ts` — POST `{ resolutions: Record<hunkIndex, 'ours'|'theirs'|'both'|{custom:string}> }` → scans merged content for secrets via temp file, writes resolved node to disk. Returns `{ ok, secretBlocked?, scanSnippet? }`. `Resolution` type (exported from `conflicts.ts`) now includes `{ custom: string }` for user/AI-authored "write your own" text; `resolveNode` splits custom text on newlines.
+- `webapp/src/app/api/conflicts/[id]/recommend/route.ts` — POST → loads the node's hunks and calls the Anthropic Messages REST API directly (no SDK dep; model `claude-sonnet-4-6`, `ANTHROPIC_API_KEY` — same key as the Scribe) to recommend `ours|theirs|both|custom` per hunk with a one-line rationale (+ `suggestedText` for custom). Returns `{ recommendations: [{ index, choice, rationale, suggestedText? }] }`. Returns 503 with a clear message when `ANTHROPIC_API_KEY` is unset; the UI surfaces it as a toast. **Requires `ANTHROPIC_API_KEY` in the webapp env (e.g. `webapp/.env.local`) for the AI panel to work.**
+- `webapp/src/app/merge/page.tsx` — client component: GitHub-dark conflict resolution UI matching VaultMind Merge design. Fetches conflicts list + per-node detail, renders diff editor with accept/reject per hunk, progress bar, scan-blocked panel, toast notifications, dark/light theme toggle. Now also: **"Write your own"** per-hunk custom-text editor (textarea, seed-from-both helper), and a real **VaultMind AI** right-rail panel ("Get AI recommendation") that posts to `/recommend`, shows per-hunk "AI suggests …" banners with one-click apply, and "Apply all AI suggestions".
+- `vault/nodes/2026-06-21-1530-7c2f9a14-demo-auth-conflict.md` — seed demo node with two real `<<<<<<<`/`=======`/`>>>>>>>` conflict hunks (auth strategy), so the Merge page has something to render. Safe to delete once real conflicts exist.
 - `webapp/src/app/globals.css` — added VaultMind CSS variables (dark/light via `data-vmtheme`) + `vm-fade`/`vm-toast` keyframes.
 - `webapp/src/app/layout.tsx` — added JetBrains Mono font, updated metadata.
 
 ## Last Updated
+2026-06-22 — README rewritten (branch `docs/readme-rewrite`, PR #7) to reflect the actual app
+rather than SPEC.md: added objective/problem/solution framing, accurate tech-stack table
+(Pydantic v2, Anthropic claude-sonnet-4-6, Redis Stack, RedisVL + all-MiniLM-L6-v2, Arize/OTel,
+Next.js 15/React 19, Fetch.AI uAgents, Flask bridge), and a per-module/per-route inventory now
+including the Setup/Graph/Intent pages, AgentChat + useAgent + webapp/agent_bridge.py, the
+memory/ (vector) and handoff/ modules, /api/nodes, and the deployable vault-mind-orchestrate/
+Agentverse agent. Expanded setup into a full end-to-end guide (Redis Stack Docker-or-local,
+run-by-hand, optional Orchestrator agent + ASI:One publishing). Includes an honest "pipeline
+status" note that watcher.py ships wired to stub scribe/notecreator/connector seams while the
+real agents are implemented + tested. README-only change.
+
+2026-06-22 — Merge page upgraded: (1) per-hunk "Write your own" custom-text resolution
+(new `{custom:string}` variant on `Resolution` in conflicts.ts + resolve route validation);
+(2) real per-hunk AI recommendations via new `/api/conflicts/[id]/recommend` route calling the
+Anthropic Messages REST API (claude-sonnet-4-6, `ANTHROPIC_API_KEY`) — inline "AI suggests"
+banners + apply-all; (3) seed demo conflict node so the page renders. Verified: tsc clean, no new
+lint errors, /api/conflicts + detail + custom resolve confirmed via running dev server. AI panel
+needs `ANTHROPIC_API_KEY` in the webapp env to function (graceful 503 + toast otherwise).
+
 2026-06-20 — Merge page implemented: conflict resolution UI (VaultMind Merge design) wired to real backend. API routes: GET /api/conflicts, GET /api/conflicts/[id], POST /api/conflicts/[id]/resolve. Server-side git conflict parser + secret scanner in webapp/src/lib/conflicts.ts. TypeScript compiles clean.
 
 2026-06-20 — Execution-model pivot (DEVIN-PIVOT-SPEC.md): updated SPEC.md, WORKSTREAMS.md, and
